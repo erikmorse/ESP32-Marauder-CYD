@@ -91,7 +91,7 @@ void Sspixfer (uint16_t dout)    // Exchange 8 bits of data over SPI
 uint8_t TFT_eSPI::getTouchRaw(uint16_t *x, uint16_t *y){
   uint16_t tmp;
 
-#ifdef SOFTSPI
+#if defined(SOFTSPI) || (defined(TOUCH_MOSI) && defined(TOUCH_MISO) && defined(TOUCH_CLK))
 
   digitalWrite(TOUCH_CS,0); 
   Sspixfer(0xD0);            // Start new YP conversion
@@ -164,7 +164,7 @@ uint8_t TFT_eSPI::getTouchRaw(uint16_t *x, uint16_t *y){
 ***************************************************************************************/
 uint16_t TFT_eSPI::getTouchRawZ(void){
 
-#if defined SOFTSPI
+#if defined(SOFTSPI) || (defined(TOUCH_MOSI) && defined(TOUCH_MISO) && defined(TOUCH_CLK))
 
 
   int16_t tz = 0xFFF;
