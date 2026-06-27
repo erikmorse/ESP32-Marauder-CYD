@@ -1008,7 +1008,7 @@ void MenuFunctions::main(uint32_t currentTime)
           for (uint8_t b = 0; b < current_menu->list->size(); b++) {
             display_obj.tft.setFreeFont(MENU_FONT);
             if (display_obj.key[b].justPressed()) {
-                display_obj.key[b].drawButton(true, current_menu->list->get(b).name); // Pressed state
+                display_obj.key[b].drawButton(current_menu->list->get(b).name != text09, current_menu->list->get(b).name); // Pressed state
                 if (current_menu->list->get(b).name != text09) {
                     uint16_t icon_color = this->getColor(current_menu->list->get(b).color);
                     display_obj.tft.setTextColor(icon_color, TFT_BLACK); // Set color state explicitly
