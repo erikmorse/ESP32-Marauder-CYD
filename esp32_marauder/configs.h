@@ -1662,7 +1662,12 @@
 
   //// GPS STUFF
   #ifdef HAS_GPS
-    #if defined(MARAUDER_V6) || defined(MARAUDER_V6_1)
+    #if defined(CYD_28)
+      #define GPS_SERIAL_INDEX 2
+      #define GPS_TX -1
+      #define GPS_RX 3
+      #define mac_history_len 100
+    #elif defined(MARAUDER_V6) || defined(MARAUDER_V6_1)
       #define GPS_SERIAL_INDEX 2
       #define GPS_TX 4
       #define GPS_RX 13

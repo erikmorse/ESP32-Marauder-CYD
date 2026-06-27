@@ -24,17 +24,24 @@ void GpsInterface::begin() {
     delay(100);
   #endif*/
 
-  
-  Serial2.begin(9600, SERIAL_8N1, GPS_TX, GPS_RX);
+  #ifdef CYD_28
+    Serial2.begin(9600, SERIAL_8N1, GPS_RX, GPS_TX);
+    delay(1200);
+    bool gps_found = Serial2.available();
+  #else
+    Serial2.begin(9600, SERIAL_8N1, GPS_TX, GPS_RX);
 
-  MicroNMEA::sendSentence(Serial2, "$PSTMSETPAR,1201,0x00000042");
-  MicroNMEA::sendSentence(Serial2, "$PSTMSAVEPAR");
+    MicroNMEA::sendSentence(Serial2, "$PSTMSETPAR,1201,0x00000042");
+    MicroNMEA::sendSentence(Serial2, "$PSTMSAVEPAR");
 
-  MicroNMEA::sendSentence(Serial2, "$PSTMSRR");
+    MicroNMEA::sendSentence(Serial2, "$PSTMSRR");
 
-  delay(1000);
+    delay(1000);
 
-  if (Serial2.available()) {
+    bool gps_found = Serial2.available();
+  #endif
+
+  if (gps_found) {
     Serial.println("GPS Attached Successfully");
     this->gps_enabled = true;
     while (Serial2.available()) {
