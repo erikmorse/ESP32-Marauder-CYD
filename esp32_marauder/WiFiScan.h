@@ -104,6 +104,8 @@
 #define BT_SCAN_ANALYZER 47
 #define WIFI_SCAN_PACKET_RATE 48
 #define WIFI_SCAN_AP_STA 49
+#define BT_SCAN_FLOCK 50
+#define WIFI_SCAN_FLOCK_WAR_DRIVE 51
 
 
 #define BASE_MULTIPLIER 4
@@ -259,6 +261,36 @@ class WiFiScan
 
     char* prefix = "G";
 
+    uint8_t flock_oui_list[27][3] = {
+      {0x58, 0x8E, 0x81},
+      {0xCC, 0xCC, 0xCC},
+      {0xEC, 0x1B, 0xBD},
+      {0x90, 0x35, 0xEA},
+      {0x04, 0x0D, 0x84},
+      {0xF0, 0x82, 0xC0},
+      {0x1C, 0x34, 0xF1},
+      {0x38, 0x5B, 0x44},
+      {0x94, 0x34, 0x69},
+      {0xB4, 0xE3, 0xF9},
+      {0x70, 0xC9, 0x4E},
+      {0x3C, 0x91, 0x80},
+      {0xD8, 0xF3, 0xBC},
+      {0x80, 0x30, 0x49},
+      {0x14, 0x5A, 0xFC},
+      {0x74, 0x4C, 0xA1},
+      {0x08, 0x3A, 0x88},
+      {0x9C, 0x2F, 0x9D},
+      {0x94, 0x08, 0x53},
+      {0xE4, 0xAA, 0xEA},
+      {0xF4, 0x6A, 0xDD},
+      {0xF8, 0xA2, 0xD6},
+      {0xE0, 0x0A, 0xF6},
+      {0x00, 0xF4, 0x8D},
+      {0xD0, 0x39, 0x57},
+      {0xE8, 0xD0, 0xFC},
+      {0xB4, 0x1E, 0x52}
+    };
+
     typedef struct
     {
       int16_t fctl;
@@ -350,7 +382,6 @@ class WiFiScan
     void executeSwiftpairSpam(EBLEPayloadType type);
     void startWardriverWiFi();
     String processPwnagotchiBeacon(const uint8_t* frame, int length);
-
     void startWiFiAttacks(uint8_t scan_mode, uint16_t color, String title_string);
 
     void signalAnalyzerLoop(uint32_t tick);
@@ -394,6 +425,8 @@ class WiFiScan
 
   public:
     WiFiScan();
+    bool checkFlockOUI(const uint8_t mac[6]);
+    bool isFlockCamera(const uint8_t* payload, size_t len, const String& name, String* serial_out);
 
     // Stuff for RAW stats
     uint32_t mgmt_frames = 0;
@@ -412,6 +445,8 @@ class WiFiScan
 
     bool analyzer_name_update = false;
 
+    uint32_t flock_devices = 0;
+
     uint8_t set_channel = 1;
     
     uint8_t old_channel = 0;
@@ -421,6 +456,14 @@ class WiFiScan
     bool orient_display = false;
     bool wifi_initialized = false;
     bool ble_initialized = false;
+
+    const char* flock_ssid[5] = {
+      "flock",
+      "penguin",
+      "pigvision",
+      "fs ext battery",
+      "Flock"
+    };
 
     String free_ram = "";
     String old_free_ram = "";

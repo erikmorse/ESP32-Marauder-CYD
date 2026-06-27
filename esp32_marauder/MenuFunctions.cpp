@@ -843,6 +843,7 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_STATION) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_AP) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_WAR_DRIVE) ||
+            (wifi_scan_obj.currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_EVIL_PORTAL) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_TARGET_AP) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_TARGET_AP_FULL) ||
@@ -863,6 +864,7 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == BT_SCAN_ALL) ||
             (wifi_scan_obj.currentScanMode == BT_SCAN_AIRTAG) ||
             (wifi_scan_obj.currentScanMode == BT_SCAN_FLIPPER) ||
+            (wifi_scan_obj.currentScanMode == BT_SCAN_FLOCK) ||
             (wifi_scan_obj.currentScanMode == BT_ATTACK_SOUR_APPLE) ||
             (wifi_scan_obj.currentScanMode == BT_ATTACK_SWIFTPAIR_SPAM) ||
             (wifi_scan_obj.currentScanMode == BT_ATTACK_SPAM_ALL) ||
@@ -910,6 +912,7 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_STATION) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_AP) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_WAR_DRIVE) ||
+            (wifi_scan_obj.currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_EVIL_PORTAL) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_SIG_STREN) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_TARGET_AP) ||
@@ -929,6 +932,7 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == WIFI_ATTACK_RICK_ROLL) ||
             (wifi_scan_obj.currentScanMode == WIFI_ATTACK_BEACON_LIST) ||
             (wifi_scan_obj.currentScanMode == BT_SCAN_ALL) ||
+            (wifi_scan_obj.currentScanMode == BT_SCAN_FLOCK) ||
             (wifi_scan_obj.currentScanMode == BT_ATTACK_SOUR_APPLE) ||
             (wifi_scan_obj.currentScanMode == BT_ATTACK_SWIFTPAIR_SPAM) ||
             (wifi_scan_obj.currentScanMode == BT_ATTACK_SPAM_ALL) ||
@@ -2323,8 +2327,18 @@ void MenuFunctions::RunSetup()
     this->drawStatusBar();
     wifi_scan_obj.StartScan(BT_SCAN_AIRTAG, TFT_WHITE);
   });
+  this->addNodes(&bluetoothSnifferMenu, "Flock Sniff", TFTORANGE, NULL, BLUETOOTH_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.StartScan(BT_SCAN_FLOCK, TFT_ORANGE);
+  });
   #ifdef HAS_GPS
     if (gps_obj.getGpsModuleStatus()) {
+      this->addNodes(&bluetoothSnifferMenu, "Flock Wardrive", TFTORANGE, NULL, GPS_MENU, [this]() {
+        display_obj.clearScreen();
+        this->drawStatusBar();
+        wifi_scan_obj.StartScan(WIFI_SCAN_FLOCK_WAR_DRIVE, TFT_ORANGE);
+      });
       this->addNodes(&bluetoothSnifferMenu, "BT Wardrive", TFTCYAN, NULL, BLUETOOTH_SNIFF, [this]() {
         display_obj.clearScreen();
         this->drawStatusBar();
