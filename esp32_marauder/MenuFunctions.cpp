@@ -3035,7 +3035,7 @@ uint16_t MenuFunctions::getColor(uint16_t color) {
   else if (color == TFTVIOLET) return TFT_VIOLET;
   else if (color == TFTORANGE) return TFT_ORANGE;
   else if (color == TFTYELLOW) return TFT_YELLOW;
-  else if (color == TFTLIGHTGREY) return TFT_LIGHTGREY;
+  else if (color == TFTLIGHTGREY) return TFT_GREEN;
   else if (color == TFTPURPLE) return TFT_PURPLE;
   else if (color == TFTNAVY) return TFT_NAVY;
   else if (color == TFTSILVER) return TFT_SILVER;
