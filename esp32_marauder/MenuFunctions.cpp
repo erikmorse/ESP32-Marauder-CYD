@@ -3064,7 +3064,9 @@ void MenuFunctions::changeMenu(Menu * menu)
 {
   display_obj.initScrollValues();
   display_obj.setupScrollArea(TOP_FIXED_AREA, BOT_FIXED_AREA);
-  display_obj.tft.init();
+  #ifndef CYD_28
+    display_obj.tft.init();
+  #endif
   current_menu = menu;
 
   current_menu->selected = 0;
