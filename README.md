@@ -178,22 +178,6 @@ For best validation, compare:
 - Whether timestamps/session names are consistent
 - Whether KML/GPX output imports cleanly into mapping tools
 
-## Branch And Remote Layout
-
-Recommended remote layout:
-
-```text
-origin   -> erikmorse/ESP32-Marauder-CYD
-upstream -> Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display
-```
-
-Recommended working branch:
-
-```text
-cyd-black-theme
-```
-
-This keeps personal CYD changes separate from the upstream CYD fork.
 
 ## Safety And Legal Notice
 
