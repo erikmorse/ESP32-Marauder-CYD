@@ -878,7 +878,9 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == BT_SCAN_ANALYZER)) 
         {
             wifi_scan_obj.StartScan(WIFI_SCAN_OFF);
-            display_obj.tft.init();
+            #ifndef CYD_28
+              display_obj.tft.init();
+            #endif
             changeMenu(current_menu);
             delay(100);
         }
@@ -950,7 +952,9 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == BT_SCAN_ANALYZER))
           {
             wifi_scan_obj.StartScan(WIFI_SCAN_OFF);
-            display_obj.tft.init();
+            #ifndef CYD_28
+              display_obj.tft.init();
+            #endif
             changeMenu(current_menu);
             delay(100); // Brief delay to ignore residual touches after exit
           }
@@ -1579,7 +1583,9 @@ void MenuFunctions::drawStatusBar()
 
 void MenuFunctions::orientDisplay()
 {
-  display_obj.tft.init();
+  #ifndef CYD_28
+    display_obj.tft.init();
+  #endif
 
   display_obj.tft.setRotation(0); // Portrait
 
