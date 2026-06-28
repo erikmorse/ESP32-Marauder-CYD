@@ -582,14 +582,121 @@ WiFiScan::WiFiScan()
 }
 
 bool WiFiScan::checkFlockOUI(const uint8_t mac[6]) {
-  size_t oui_count = sizeof(this->flock_oui_list) / sizeof(this->flock_oui_list[0]);
+  return this->flockOUIRule(mac).length() > 0;
+}
 
-  for (size_t i = 0; i < oui_count; i++) {
-    if (memcmp(mac, this->flock_oui_list[i], 3) == 0)
+String WiFiScan::flockOUIRule(const uint8_t mac[6]) {
+  static const uint8_t direct_oui[][3] = {
+    {0x58, 0x8E, 0x81}, {0xCC, 0xCC, 0xCC}, {0xEC, 0x1B, 0xBD}, {0x90, 0x35, 0xEA},
+    {0x04, 0x0D, 0x84}, {0xF0, 0x82, 0xC0}, {0x1C, 0x34, 0xF1}, {0x38, 0x5B, 0x44},
+    {0x94, 0x34, 0x69}, {0xB4, 0xE3, 0xF9}, {0x70, 0xC9, 0x4E}, {0x3C, 0x91, 0x80},
+    {0xD8, 0xF3, 0xBC}, {0x80, 0x30, 0x49}, {0x14, 0x5A, 0xFC}, {0x74, 0x4C, 0xA1},
+    {0x08, 0x3A, 0x88}, {0x9C, 0x2F, 0x9D}, {0x94, 0x08, 0x53}, {0xE4, 0xAA, 0xEA},
+    {0xB4, 0x1E, 0x52}
+  };
+
+  static const uint8_t mfr_oui[][3] = {
+    {0xF4, 0x6A, 0xDD}, {0xF8, 0xA2, 0xD6}, {0xE0, 0x0A, 0xF6},
+    {0x00, 0xF4, 0x8D}, {0xD0, 0x39, 0x57}, {0xE8, 0xD0, 0xFC}
+  };
+
+  static const uint8_t sound_oui[][3] = {
+    {0xD4, 0x11, 0xD6}
+  };
+
+  for (size_t i = 0; i < sizeof(direct_oui) / sizeof(direct_oui[0]); i++) {
+    if (memcmp(mac, direct_oui[i], 3) == 0)
+      return "oui_flock";
+  }
+
+  for (size_t i = 0; i < sizeof(mfr_oui) / sizeof(mfr_oui[0]); i++) {
+    if (memcmp(mac, mfr_oui[i], 3) == 0)
+      return "oui_mfr";
+  }
+
+  for (size_t i = 0; i < sizeof(sound_oui) / sizeof(sound_oui[0]); i++) {
+    if (memcmp(mac, sound_oui[i], 3) == 0)
+      return "oui_sound";
+  }
+
+  return "";
+}
+
+String WiFiScan::flockSSIDRule(const String& ssid) {
+  if (ssid.length() == 0)
+    return "";
+
+  if (ssid.equalsIgnoreCase("test_flck"))
+    return "ssid_exact";
+
+  if ((ssid.length() == 12) && ssid.substring(0, 6).equalsIgnoreCase("Flock-")) {
+    bool all_hex = true;
+    for (uint8_t i = 6; i < 12; i++) {
+      char c = ssid.charAt(i);
+      if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
+        all_hex = false;
+        break;
+      }
+    }
+    if (all_hex)
+      return "ssid_pattern";
+  }
+
+  if (strcasestr(ssid.c_str(), "flock"))
+    return "ssid_flock";
+
+  if (strcasestr(ssid.c_str(), "flck"))
+    return "ssid_flck";
+
+  if (strcasestr(ssid.c_str(), "penguin"))
+    return "ssid_penguin";
+
+  if (strcasestr(ssid.c_str(), "pigvision"))
+    return "ssid_pigvision";
+
+  if (strcasestr(ssid.c_str(), "fs ext battery"))
+    return "ssid_battery";
+
+  return "";
+}
+
+bool WiFiScan::extractTaggedSSID(const uint8_t* payload, int len, uint16_t tagged_offset, String& ssid) {
+  ssid = "";
+  if ((payload == nullptr) || (tagged_offset >= len))
+    return false;
+
+  uint16_t pos = tagged_offset;
+  while (pos + 2 <= len) {
+    uint8_t tag_id = payload[pos];
+    uint8_t tag_len = payload[pos + 1];
+    if (pos + 2 + tag_len > len)
+      break;
+
+    if (tag_id == 0) {
+      for (uint8_t i = 0; i < tag_len; i++) {
+        char c = (char)payload[pos + 2 + i];
+        if (c >= 32 && c <= 126)
+          ssid.concat(c);
+      }
       return true;
+    }
+
+    pos += 2 + tag_len;
   }
 
   return false;
+}
+
+bool WiFiScan::flockSSIDIsHidden(const String& ssid) {
+  if (ssid.length() == 0)
+    return true;
+
+  for (uint16_t i = 0; i < ssid.length(); i++) {
+    if (ssid.charAt(i) != '\0')
+      return false;
+  }
+
+  return true;
 }
 
 bool WiFiScan::isFlockCamera(const uint8_t* payload, size_t len, const String& name, String* serial_out) {
@@ -3138,11 +3245,10 @@ void WiFiScan::executeWarDrive() {
           String ssid = WiFi.SSID(i);
           ssid.replace(",","_");
 
-          bool flock_match = this->checkFlockOUI(this_bssid_raw);
-          for (int x = 0; x < 5 && !flock_match; x++) {
-            if (strcasestr(ssid.c_str(), this->flock_ssid[x]))
-              flock_match = true;
-          }
+          String flock_rule = this->flockOUIRule(this_bssid_raw);
+          if (!flock_rule.length())
+            flock_rule = this->flockSSIDRule(ssid);
+          bool flock_match = flock_rule.length() > 0;
 
           if ((this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) && !flock_match)
             continue;
@@ -3167,7 +3273,7 @@ void WiFiScan::executeWarDrive() {
               this->flock_wifi_hits++;
               if (WiFi.RSSI(i) > this->flock_strongest_rssi)
                 this->flock_strongest_rssi = WiFi.RSSI(i);
-              this->flock_last_seen = "WiFi " + (String)WiFi.RSSI(i) + " " + (ssid.length() ? ssid : (String)this_bssid);
+              this->flock_last_seen = "WiFi " + flock_rule + " " + (String)WiFi.RSSI(i) + " " + (ssid.length() ? ssid : (String)this_bssid);
             }
             display_string.concat(" | Lt: " + gps_obj.getLat());
             display_string.concat(" | Ln: " + gps_obj.getLon());
@@ -5219,62 +5325,67 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
     //#endif
 
     if (wifi_scan_obj.currentScanMode == BT_SCAN_FLOCK) {
-      bool do_write = false;
-      bool is_probe = snifferPacket->payload[0] == 0x40;
-      bool is_beacon = snifferPacket->payload[0] == 0x80;
+      uint8_t subtype = (snifferPacket->payload[0] >> 4) & 0x0F;
+      bool is_probe = subtype == 0x04;
+      bool is_probe_resp = subtype == 0x05;
+      bool is_beacon = subtype == 0x08;
       uint8_t addr_bytes[6];
       char addr[] = "00:00:00:00:00:00";
+      String frame_name = "";
+      String ssid_rule = "";
+      String oui_rule = "";
+      String match_rule = "";
+      bool hidden_flag = false;
+      uint16_t tagged_offset = 0;
 
-      if (is_probe && len > 26) {
-        memcpy(addr_bytes, &snifferPacket->payload[10], 6);
-        getMAC(addr, snifferPacket->payload, 10);
-
-        uint8_t ssid_len = snifferPacket->payload[25];
-        if (ssid_len > len - 26)
-          ssid_len = len - 26;
-
-        for (int i = 0; i < ssid_len; i++)
-          essid.concat((char)snifferPacket->payload[26 + i]);
+      if (is_probe && len > 24) {
+        frame_name = "PROBE_REQ";
+        tagged_offset = 24;
       }
-      else if (is_beacon && len > 38) {
-        memcpy(addr_bytes, &snifferPacket->payload[10], 6);
-        getMAC(addr, snifferPacket->payload, 10);
-
-        uint8_t ssid_len = snifferPacket->payload[37];
-        if (ssid_len > len - 38)
-          ssid_len = len - 38;
-
-        for (int i = 0; i < ssid_len; i++)
-          essid.concat((char)snifferPacket->payload[38 + i]);
+      else if (is_probe_resp && len > 36) {
+        frame_name = "PROBE_RESP";
+        tagged_offset = 36;
+      }
+      else if (is_beacon && len > 36) {
+        frame_name = "BEACON";
+        tagged_offset = 36;
       }
       else {
         return;
       }
 
-      for (int i = 0; i < 5; i++) {
-        if (strcasestr(essid.c_str(), wifi_scan_obj.flock_ssid[i])) {
-          do_write = true;
-          break;
-        }
-      }
+      memcpy(addr_bytes, &snifferPacket->payload[10], 6);
+      getMAC(addr, snifferPacket->payload, 10);
+      wifi_scan_obj.extractTaggedSSID(snifferPacket->payload, len, tagged_offset, essid);
 
-      if (!do_write && wifi_scan_obj.checkFlockOUI(addr_bytes))
-        do_write = true;
+      if (!is_probe)
+        hidden_flag = wifi_scan_obj.flockSSIDIsHidden(essid);
 
-      if (do_write) {
+      if (!hidden_flag)
+        ssid_rule = wifi_scan_obj.flockSSIDRule(essid);
+
+      oui_rule = wifi_scan_obj.flockOUIRule(addr_bytes);
+      match_rule = ssid_rule.length() ? ssid_rule : oui_rule;
+
+      if (hidden_flag && oui_rule.length())
+        match_rule = "hidden_" + oui_rule;
+
+      if (match_rule.length()) {
         bool is_new = wifi_scan_obj.recordFlockDevice(addr_bytes,
                                                       snifferPacket->rx_ctrl.rssi,
                                                       "WiFi",
-                                                      essid.length() ? essid : String(addr));
+                                                      match_rule + " " + (essid.length() ? essid : String(addr)));
 
         #ifdef HAS_SCREEN
-          display_string.concat(is_probe ? MAGENTA_KEY : GREEN_KEY);
+          display_string.concat(is_probe ? MAGENTA_KEY : (hidden_flag ? RED_KEY : GREEN_KEY));
           if (is_new)
             display_string.concat("NEW ");
+          display_string.concat(match_rule);
+          display_string.concat(" ");
           display_string.concat((String)snifferPacket->rx_ctrl.rssi);
           display_string.concat(" ");
           display_string.concat(addr);
-          display_string.concat(is_probe ? " -> " : " AP ");
+          display_string.concat(" ");
           display_string.concat(essid.length() ? essid : "(hidden)");
 
           int temp_len = display_string.length();
@@ -5285,7 +5396,14 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
         #endif
 
         Serial.print("Flock WiFi ");
-        Serial.print(is_probe ? "probe " : "beacon ");
+        Serial.print(frame_name);
+        Serial.print(" MATCH(");
+        Serial.print(match_rule);
+        if (ssid_rule.length() && oui_rule.length() && (ssid_rule != match_rule)) {
+          Serial.print("+");
+          Serial.print(oui_rule);
+        }
+        Serial.print(") ");
         Serial.print("RSSI: ");
         Serial.print(snifferPacket->rx_ctrl.rssi);
         Serial.print(" Ch: ");
@@ -5298,6 +5416,16 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
         Serial.println(essid.length() ? essid : "(hidden)");
 
         buffer_obj.append(snifferPacket, len);
+      }
+      else if (hidden_flag) {
+        Serial.print("Flock WiFi HIDDEN_REVIEW ");
+        Serial.print(frame_name);
+        Serial.print(" RSSI: ");
+        Serial.print(snifferPacket->rx_ctrl.rssi);
+        Serial.print(" Ch: ");
+        Serial.print(snifferPacket->rx_ctrl.channel);
+        Serial.print(" MAC: ");
+        Serial.println(addr);
       }
 
       return;

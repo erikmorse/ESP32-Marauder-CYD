@@ -422,6 +422,10 @@ class WiFiScan
     void RunEvilPortal(uint8_t scan_mode, uint16_t color);
     bool checkMem();
     void parseBSSID(const char* bssidStr, uint8_t* bssid);
+    String flockOUIRule(const uint8_t mac[6]);
+    String flockSSIDRule(const String& ssid);
+    bool extractTaggedSSID(const uint8_t* payload, int len, uint16_t tagged_offset, String& ssid);
+    bool flockSSIDIsHidden(const String& ssid);
     String flockTimestampSuffix();
     String flockExportFileName(String prefix, String ext);
     void beginFlockMapExports();
