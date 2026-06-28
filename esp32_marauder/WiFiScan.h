@@ -422,11 +422,19 @@ class WiFiScan
     void RunEvilPortal(uint8_t scan_mode, uint16_t color);
     bool checkMem();
     void parseBSSID(const char* bssidStr, uint8_t* bssid);
+    String flockTimestampSuffix();
+    String flockExportFileName(String prefix, String ext);
+    void beginFlockMapExports();
 
   public:
     WiFiScan();
     bool checkFlockOUI(const uint8_t mac[6]);
     bool isFlockCamera(const uint8_t* payload, size_t len, const String& name, String* serial_out);
+    void resetFlockSession();
+    bool recordFlockDevice(uint8_t mac[6], int rssi, const String& source, const String& label);
+    void appendFlockMapHit(const String& mac, const String& ssid, int channel, int rssi, const String& type);
+    void closeFlockMapExports();
+    void drawFlockDashboard();
 
     // Stuff for RAW stats
     uint32_t mgmt_frames = 0;
@@ -446,6 +454,15 @@ class WiFiScan
     bool analyzer_name_update = false;
 
     uint32_t flock_devices = 0;
+    uint32_t flock_unique_devices = 0;
+    uint32_t flock_ble_hits = 0;
+    uint32_t flock_wifi_hits = 0;
+    int16_t flock_strongest_rssi = -128;
+    String flock_last_seen = "";
+    String flock_session_suffix = "";
+    String flock_kml_file = "";
+    String flock_gpx_file = "";
+    bool flock_map_exports_open = false;
 
     uint8_t set_channel = 1;
     
