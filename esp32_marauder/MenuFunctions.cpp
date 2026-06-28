@@ -1654,6 +1654,116 @@ void MenuFunctions::displaySetting(String key, Menu* menu, int index) {
     
 }
 
+bool MenuFunctions::waitForTouchExit(uint32_t min_delay) {
+  uint32_t start = millis();
+
+  while (millis() - start < min_delay)
+    delay(10);
+
+  while (true) {
+    #if defined(CYD_32CAP) || defined(CYD_35CAP)
+      int16_t t_x[5] = {0, 0, 0, 0, 0};
+      int16_t t_y[5] = {0, 0, 0, 0, 0};
+      if (this->updateTouch(t_x, t_y, 600) > 0)
+        return true;
+    #else
+      uint16_t t_x = 0;
+      uint16_t t_y = 0;
+      if (this->updateTouch(&t_x, &t_y, 600) > 0)
+        return true;
+    #endif
+
+    delay(25);
+  }
+}
+
+void MenuFunctions::showDiagnostics() {
+  display_obj.clearScreen();
+  display_obj.tft.setTextWrap(false);
+  display_obj.tft.setTextSize(1);
+  display_obj.tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  display_obj.tft.setCursor(0, 0);
+  display_obj.tft.println("Diagnostics");
+  display_obj.tft.println("");
+  display_obj.tft.println("FW: " + (String)MARAUDER_VERSION);
+  display_obj.tft.println("Heap: " + (String)ESP.getFreeHeap());
+
+  #ifdef HAS_SD
+    display_obj.tft.println("SD: " + (String)(sd_obj.supported ? "OK" : "Missing"));
+    if (sd_obj.supported)
+      display_obj.tft.println("SD MB: " + (String)sd_obj.cardSizeMB);
+  #endif
+
+  #ifdef HAS_GPS
+    display_obj.tft.println("GPS: " + (String)(gps_obj.getGpsModuleStatus() ? "OK" : "Missing"));
+    display_obj.tft.println("Fix: " + gps_obj.getFixStatusAsString());
+    display_obj.tft.println("Sats: " + gps_obj.getNumSatsString());
+    display_obj.tft.println("Lat: " + gps_obj.getLat());
+    display_obj.tft.println("Lon: " + gps_obj.getLon());
+  #endif
+
+  display_obj.tft.println("CH: " + (String)wifi_scan_obj.set_channel);
+  display_obj.tft.println("");
+  display_obj.tft.println("Touch to exit");
+
+  this->waitForTouchExit();
+  this->changeMenu(&deviceMenu);
+}
+
+void MenuFunctions::showTouchTest() {
+  display_obj.clearScreen();
+  display_obj.tft.setTextWrap(false);
+  display_obj.tft.setTextSize(1);
+  display_obj.tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  display_obj.tft.setCursor(0, 0);
+  display_obj.tft.println("Touch Test");
+  display_obj.tft.println("Tap upper-right to exit");
+
+  while (true) {
+    bool touched = false;
+    int16_t draw_x = 0;
+    int16_t draw_y = 0;
+
+    #if defined(CYD_32CAP) || defined(CYD_35CAP)
+      int16_t t_x[5] = {0, 0, 0, 0, 0};
+      int16_t t_y[5] = {0, 0, 0, 0, 0};
+      uint8_t points = this->updateTouch(t_x, t_y, 600);
+      if (points > 0) {
+        touched = true;
+        draw_x = t_x[0];
+        draw_y = t_y[0];
+      }
+    #else
+      uint16_t t_x = 0;
+      uint16_t t_y = 0;
+      if (this->updateTouch(&t_x, &t_y, 600) > 0) {
+        touched = true;
+        draw_x = t_x;
+        draw_y = t_y;
+      }
+    #endif
+
+    if (touched) {
+      if ((draw_x > TFT_WIDTH - 48) && (draw_y < 48))
+        break;
+
+      display_obj.tft.fillRect(0, 48, TFT_WIDTH, TFT_HEIGHT - 48, TFT_BLACK);
+      display_obj.tft.setCursor(0, 56);
+      display_obj.tft.setTextColor(TFT_GREEN, TFT_BLACK);
+      display_obj.tft.println("X: " + (String)draw_x);
+      display_obj.tft.println("Y: " + (String)draw_y);
+      display_obj.tft.println("");
+      display_obj.tft.println("Top-right exits");
+      display_obj.tft.drawCircle(draw_x, draw_y, 6, TFT_ORANGE);
+      Serial.println("Touch Test X:" + (String)draw_x + " Y:" + (String)draw_y);
+    }
+
+    delay(25);
+  }
+
+  this->changeMenu(&deviceMenu);
+}
+
 // Function to build the menus
 void MenuFunctions::RunSetup()
 {
@@ -2484,6 +2594,14 @@ void MenuFunctions::RunSetup()
     wifi_scan_obj.currentScanMode = SHOW_INFO;
     this->changeMenu(&infoMenu);
     wifi_scan_obj.RunInfo();
+  });
+  this->addNodes(&deviceMenu, "Diagnostics", TFTGREEN, NULL, DEVICE_INFO, [this]() {
+    wifi_scan_obj.currentScanMode = SHOW_INFO;
+    this->showDiagnostics();
+  });
+  this->addNodes(&deviceMenu, "Touch Test", TFTORANGE, NULL, DISABLE_TOUCH, [this]() {
+    wifi_scan_obj.currentScanMode = SHOW_INFO;
+    this->showTouchTest();
   });
   this->addNodes(&deviceMenu, text08, TFTNAVY, NULL, KEYBOARD_ICO, [this]() {
     this->changeMenu(&settingsMenu);
