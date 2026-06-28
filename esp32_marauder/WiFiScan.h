@@ -433,8 +433,10 @@ class WiFiScan
     void resetFlockSession();
     bool recordFlockDevice(uint8_t mac[6], int rssi, const String& source, const String& label);
     void appendFlockMapHit(const String& mac, const String& ssid, int channel, int rssi, const String& type);
+    void appendFlockTrackPoint();
     void closeFlockMapExports();
     void drawFlockDashboard();
+    void showFlockSummary();
 
     // Stuff for RAW stats
     uint32_t mgmt_frames = 0;

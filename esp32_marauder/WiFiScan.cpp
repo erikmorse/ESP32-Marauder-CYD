@@ -838,6 +838,27 @@ void WiFiScan::appendFlockMapHit(const String& mac, const String& ssid, int chan
   #endif
 }
 
+void WiFiScan::appendFlockTrackPoint() {
+  #if defined(HAS_SD) && defined(HAS_GPS)
+    if (!this->flock_map_exports_open || !sd_obj.supported || !gps_obj.getFixStatus())
+      return;
+
+    File gpx = SD.open(this->flock_gpx_file, FILE_APPEND);
+    if (gpx) {
+      gpx.print("<trkpt lat=\"");
+      gpx.print(gps_obj.getLat());
+      gpx.print("\" lon=\"");
+      gpx.print(gps_obj.getLon());
+      gpx.print("\"><ele>");
+      gpx.print(gps_obj.getAlt());
+      gpx.print("</ele><time>");
+      gpx.print(gps_obj.getDatetime());
+      gpx.print("</time></trkpt>\n");
+      gpx.close();
+    }
+  #endif
+}
+
 void WiFiScan::closeFlockMapExports() {
   #ifdef HAS_SD
     if (!this->flock_map_exports_open || !sd_obj.supported)
@@ -872,10 +893,40 @@ void WiFiScan::drawFlockDashboard() {
     display_obj.tft.print(this->flock_ble_hits);
     display_obj.tft.print(" W:");
     display_obj.tft.print(this->flock_wifi_hits);
+    display_obj.tft.print(" R:");
+    display_obj.tft.print(this->flock_strongest_rssi);
     #ifdef HAS_GPS
       display_obj.tft.print(" S:");
       display_obj.tft.print(gps_obj.getNumSatsString());
     #endif
+  #endif
+}
+
+void WiFiScan::showFlockSummary() {
+  Serial.println("==== Flock Session Summary ====");
+  Serial.println("Total hits: " + (String)this->flock_devices);
+  Serial.println("Unique: " + (String)this->flock_unique_devices);
+  Serial.println("BLE hits: " + (String)this->flock_ble_hits);
+  Serial.println("WiFi hits: " + (String)this->flock_wifi_hits);
+  Serial.println("Strongest RSSI: " + (String)this->flock_strongest_rssi);
+  Serial.println("Last seen: " + this->flock_last_seen);
+  Serial.println("Session: " + this->flock_session_suffix);
+
+  #ifdef HAS_SCREEN
+    display_obj.clearScreen();
+    display_obj.tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    display_obj.tft.setTextSize(1);
+    display_obj.tft.setCursor(0, 0);
+    display_obj.tft.println("Flock Summary");
+    display_obj.tft.println("");
+    display_obj.tft.println("Unique: " + (String)this->flock_unique_devices);
+    display_obj.tft.println("Hits: " + (String)this->flock_devices);
+    display_obj.tft.println("BLE: " + (String)this->flock_ble_hits);
+    display_obj.tft.println("WiFi: " + (String)this->flock_wifi_hits);
+    display_obj.tft.println("Best RSSI: " + (String)this->flock_strongest_rssi);
+    display_obj.tft.println("");
+    display_obj.tft.println(this->flock_last_seen.substring(0, 28));
+    delay(1500);
   #endif
 }
 
@@ -1392,6 +1443,7 @@ void WiFiScan::StopScan(uint8_t scan_mode)
 {
   if ((currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
       (currentScanMode == BT_SCAN_FLOCK)) {
+    this->showFlockSummary();
     this->closeFlockMapExports();
   }
 
@@ -3064,6 +3116,9 @@ void WiFiScan::executeWarDrive() {
     if (gps_obj.getGpsModuleStatus()) {
       bool do_save;
       String display_string;
+
+      if (this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE)
+        this->appendFlockTrackPoint();
       
       while (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
         Serial.println("Scan running...");
