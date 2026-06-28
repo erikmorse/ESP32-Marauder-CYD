@@ -19,7 +19,6 @@ The custom changes in this repo are focused on making the CYDUSB2 build reproduc
 Primary target:
 
 - Cheap Yellow Display ESP32-2432S028R / CYDUSB2
-- ESP32-WROOM module
 - ILI9341 240x320 TFT
 - XPT2046 resistive touch
 - MicroSD card slot
@@ -57,11 +56,6 @@ For large files such as PCAP, KML, GPX, or CSV logs, pulling the SD card and rea
 
 This repo is set up to use PlatformIO-managed/local project dependencies only.
 
-It does not depend on global Arduino IDE libraries such as:
-
-```text
-C:\Users\erik\OneDrive\Documents\Arduino\libraries
-```
 
 Build:
 
