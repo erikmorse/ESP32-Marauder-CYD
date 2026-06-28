@@ -1,192 +1,225 @@
-# ESP32 Marauder — Cheap Yellow Display
+# ESP32 Marauder CYD
 
-<p align="center">
-  <img alt="Marauder logo" src="https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display/blob/master/img/readme0.png" width="300">
-</p>
+ESP32 Marauder build customized for the Cheap Yellow Display ESP32-2432S028R / CYDUSB2 with ILI9341 display, XPT2046 resistive touch, GPS, SD logging, dark UI, and expanded passive Flock detection tools.
 
-<p align="center">
-  <img src="https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool/actions/workflows/pages.yml/badge.svg" alt="GitHub Actions Badge" />
-  <img src="https://img.shields.io/badge/version-1.4.3-000000?style=flat" alt="GitHub Release Version Badge" />
-  <img src="https://img.shields.io/github/issues/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display?style=flat&color=2EA44F" alt="GitHub Issues" />
-  <br>
-  <img src="https://komarev.com/ghpvc/?username=Fr4nkFletcher&label=Views&color=333333&style=flat" alt="Profile Views" />
-  <a href="https://twitter.com/Fr4nkFletcher">
-    <img src="https://img.shields.io/badge/Follow-%231DA1F2.svg?style=flat&logo=x&logoColor=white&color=1F285E" alt="Follow me on X">
-  </a>
-</p>
+This repo is a local CYD-focused PlatformIO workspace. It intentionally keeps the CYD-specific fork separate from the generic JustCallMeKoko ESP32 Marauder source.
 
-The aim of this project is to port the ESP32-Marauder firmware to the Cheap Yellow Display (CYD), offering powerful WiFi and Bluetooth testing features on an affordable and accessible hardware platform.
+## Credits
 
----
+This project is a fork/custom build based on:
 
-## 🏴‍☠️ Latest Update Highlights — added wardriving to ESP32-1732S019N (05/18/25) 🏴‍☠️
+- [Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display](https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display), credited for the Cheap Yellow Display Marauder port and CYD hardware support.
+- [justcallmekoko/ESP32Marauder](https://github.com/justcallmekoko/ESP32Marauder), credited for the original ESP32 Marauder project.
+- [0xXyc/flock-you-wifi-recon](https://github.com/0xXyc/flock-you-wifi-recon), credited as research inspiration for the additional Flock-oriented WiFi reconnaissance ideas and signatures.
 
-- Add support for ESP32-1732S019 1.9" ST7789 no touch ESP32-S3
-  - **Select button** → `BOOT`
-  - **Down button** → `GPIO47`
-  - **GPS RX** → `GPIO17`
-  - **GPS TX** → `GPIO18`
-- Add security check to AP scanning
-- Add WPS and Manufacturer check for AP scan
-- Add more stats to Raw Capture
-- Add WiFi analyzer
-- Add quick names to channel analyzer graph
-- Fix evil portal AP name character limit
-- Add packet count function
-- Add AP info
-- Add Raw Capture
-- Add single scan for AP and Stations
-- Add generate random MACs for AP and Station WiFi interface
-- Fixed sniffer output overlapping 
-- Reduced memory usage
-- Add index number to AP scan display
-- Add BLE analyzer 
-- Add support for ESP32-2432S024C 2.4" ILI9341/CST820 Capacitive Touch
-- Add support for ESP32-3248S035C 3.5" ST7796/GT911 Capacitive Touch
-- Add support for ESP32-2432S032C 3.2" ST7789/GT911 Capacitive Touch
-- Add support for ESP32-2432S032R 3.2" ST7789/XPT2046 Resistive Touch 
-- Add support for Guition ESP32-2432S024R 2.4" Resistive Touch
-- Recalibrate touch for 3.5" 
-- Fix bluetooth attack LED not turning off
-- Fix status LED for bluetooth stuff
-- Add support for ESP32-3248S035R 3.5" ST7796/XPT2046 Resistive Touch
-- Add support for Adafruit MAX17048 battery monitor
-- Update Save/Load Files menu to add for saving and loading AirTags
-- Add logging to SD for Flipper/AirTag sniff
-- Add Flipper Zero Sniff
-- Airtag Sniffing/Spoofing
-- Working Pwnagotchi Detect on all models
-- Flipper BLE Spam
-- Wardriving Menu added
-- Added compatibility for ESP32-2432S024R 2.4" Resistive Touch USB Type-C Only
-- [Guide for antenna modification](https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display/blob/master/AntennaModNew.md) using ESP-WROOM-32U with built-in IPEX/U.FL
-- [Evil Portal examples and setup](https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display/blob/master/evilportal/)
-- [How to add an external antenna](https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display/blob/master/AntennaMod.md)
+The custom changes in this repo are focused on making the CYDUSB2 build reproducible in VS Code + PlatformIO and improving the small-screen field workflow.
 
----
+## Target Hardware
 
-## Requirements
+Primary target:
 
-1. A compatible CYD module (see [Compatibility](#compatibility))
-2. Chrome browser
-3. Data-capable USB cable
-4. *(Optional)* [GPS](https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display?tab=readme-ov-file#gps-functionality) module for enhanced functionality
+- Cheap Yellow Display ESP32-2432S028R / CYDUSB2
+- ESP32-WROOM module
+- ILI9341 240x320 TFT
+- XPT2046 resistive touch
+- MicroSD card slot
+- Optional GY-NEO6MV2 / NEO-6M GPS module
 
----
+Tested local setup:
 
-## Installation Steps
+- Board environment: `cydusb2`
+- USB upload port: `COM6`
+- Serial monitor speed: `115200`
+- Upload speed: `460800`
+- PlatformIO platform: `espressif32@6.5.0`
+- Arduino ESP32 core: `2.0.14`
 
-### Web Flasher Method (Recommended)
+## Important Hardware Notes
 
-1. Go to the [CYM Web Flasher](https://fr4nkfletcher.github.io/Adafruit_WebSerial_ESPTool/)
-2. Hold BOOT on your device, click "Connect" and select
-3. Choose the appropriate Model and Version
-4. Click "Program" to start flashing
+### GPS
 
-<p align="center">
-  <img src="https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool/blob/main/assets/sc00000.jpg?raw=true" alt="CYM Web Flasher Screenshot" width="100%" style="max-width:800px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-</p>
+This build was tested with a GY-NEO6MV2 / NEO-6M GPS module.
 
-### Manual Web Flasher Method (for installing old releases)
+On this CYDUSB2 unit, the working GPS receive path was detected on UART0 RX / GPIO3. The firmware includes probing logic that can detect the attached GPS and report it in serial output.
 
-1. Visit the [manual flasher](https://fr4nkfletcher.github.io/Adafruit_WebSerial_ESPTool/manual)
-2. Hold BOOT, click Connect
-3. Set memory offset and upload files
-4. Program
+Practical note: the GPS shares the serial path in a way that can interfere with flashing. For reliable uploads, unplug the GPS before uploading firmware, then reconnect it after the upload completes.
 
-<p align="center">
-  <img src="https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool/blob/main/assets/scman1.png" alt="Manual Flashing">
-</p>
+### SD Card
 
-| Offset | -> | Bin |
-|--------|:--:|------|
-| 0x1000  | -> | [Bootloader](https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool/raw/refs/heads/main/resources/STATIC/M/CYD/esp32_marauder.ino.bootloader.bin) |
-| 0x8000  | -> | [Partitions](https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool/raw/refs/heads/main/resources/STATIC/M/CYD/esp32_marauder.ino.partitions.bin) |
-| 0x10000 | -> | [Firmware](https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool/tree/main/resources/CURRENT)   |
+The SD card is used for capture/log output. The on-screen SD status icon should show:
 
-#### Troubleshooting:
+- Red when no SD card is installed
+- Green when the SD card is detected
 
-If issues arise, try the following steps:
+For large files such as PCAP, KML, GPX, or CSV logs, pulling the SD card and reading it on a PC is currently the easiest export path.
 
-1. Unplug and restart your CYD module
-2. Hold `RST`, tap `BOOT`, release `RST` (the screen should go blank)
-3. Refresh the Web Flasher page and click "Connect"
+## PlatformIO Build
 
-For further details, check out the [Web Flasher repository](https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool).
+This repo is set up to use PlatformIO-managed/local project dependencies only.
 
-Alternatively, you can flash using [esptool.py](https://github.com/espressif/esptool) by:
+It does not depend on global Arduino IDE libraries such as:
+
+```text
+C:\Users\erik\OneDrive\Documents\Arduino\libraries
 ```
-cd ~
-git clone https://github.com/Fr4nkFletcher/Adafruit_WebSerial_ESPTool
-esptool.py --port /dev/YOURSERIALPORT write_flash 0x1000 ~/Adafruit_WebSerial_ESPTool/resources/STATIC/M/CYD/esp32_marauder.ino.bootloader.bin \
-0x8000 ~/Adafruit_WebSerial_ESPTool/resources/STATIC/M/CYD/esp32_marauder.ino.partitions.bin \
-0x10000 ~/Adafruit_WebSerial_ESPTool/resources/CURRENT/esp32_marauder_ofyourchoice.bin
+
+Build:
+
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run -e cydusb2
 ```
----
 
-### Manual Arduino IDE Method
+Upload:
 
-1. Set up your Arduino environment following the [ESP32 Marauder Arduino IDE Setup Guide](https://github.com/justcallmekoko/ESP32Marauder/wiki/arduino-ide-setup)
-2. Update your platform.txt
-3. Add the necessary libraries to your Arduino libraries folder
-4. Set the upload speed to `115200` in the Arduino IDE (tested on version 1.8.19)
-5. Upload the firmware to your CYD module
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run -e cydusb2 -t upload --upload-port COM6
+```
 
-For a step-by-step guide, refer to [Smoochiee's tutorial](https://github.com/smoochiee/MARAUDER-FOR-CYD---CHEAP-YELLOW-DISPLAY)
+Serial monitor:
 
----
+```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" device monitor -p COM6 -b 115200
+```
 
-## Compatibility
+If upload fails with a timeout while the GPS is connected, unplug the GPS, reset/boot the device if needed, and upload again.
 
-The project has been successfully tested on:
+## Current `platformio.ini`
 
-- [1.9" ESP32-S3 No Touch](https://www.aliexpress.us/item/3256807423694742.html)
-- [2.4" Capacitive Touch](https://a.co/d/bTSoo9Z)
-- [2.4" Resistive Touch](https://a.co/d/fhM7s0J)
-- [2.4" Resistive Touch Guition](https://www.aliexpress.us/item/3256806436471011.html)
-- [2.8" Resistive MicroUSB-only](https://amazon.com/dp/B0BVFXR313)
-- [2.8" Resistive MicroUSB/Type-C 2USB](https://amazon.com/dp/B0CLR7MQ91)
-- [3.2" Resistive Touch](https://www.aliexpress.us/item/3256806436888726.html)
-- [3.2" Capacitive Touch](https://a.co/d/faB7oVU)
-- [3.5" Resistive Touch](https://a.co/d/cxUc73a)
-- [3.5" Capacitive Touch](https://a.co/d/2PFDlvL)
+The active environment is `cydusb2`.
 
-No hardware modifications are required, thanks to **@ggaljoen's** fork of the [TFT_eSPI](https://github.com/ggaljoen/TFT_eSPI) library
+Key settings:
 
----
+```ini
+[platformio]
+default_envs = cydusb2
+src_dir = esp32_marauder
+lib_dir = pio-libs
 
-## GPS Functionality
+[env:cydusb2]
+platform = espressif32@6.5.0
+board = esp32dev
+framework = arduino
+board_build.partitions = min_spiffs.csv
+board_build.flash_mode = dio
+board_build.f_flash = 80000000L
+monitor_speed = 115200
+upload_speed = 460800
+lib_ldf_mode = deep+
+lib_compat_mode = off
+```
 
-GPS functionality is fully supported via the 4-pin connector near the MicroUSB port. For a list of compatible GPS hardware, refer to the [official wiki](https://github.com/justcallmekoko/ESP32Marauder/wiki/gps-modification)
+The display/touch build flags are configured for the CYDUSB2 ILI9341 + XPT2046 pinout.
 
-| GPS | -> | CYD |
-|-----|:--:|-----|
-| VCC | -> | VIN |
-| GND | -> | GND |
-| TX  | -> | TX  |
-| RX  | -> | RX  |
+## Custom Features In This Build
 
-Note: On 2.4" and 3.5" models swap RX/TX
+### CYD UI Improvements
 
----
+- Dark/black menu background
+- Higher-contrast text
+- Reduced white flash during menu transitions
+- Avoids unnecessary TFT reinitialization on CYD menu returns
+- Flock summary stays on screen until touch instead of disappearing after a short delay
 
-## Example Usage
+### Touch And Device Diagnostics
 
-After flashing, you'll boot into the Marauder interface. Refer to the [ESP32 Marauder Wiki](https://github.com/justcallmekoko/ESP32Marauder/wiki) for detailed usage instructions
+Added small-device friendly helper screens:
 
-<p align="center">
-  <img src="https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display/blob/master/screenshots/2.gif" alt="Demo 1" width="45%">
-  <img src="https://github.com/Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display/blob/master/screenshots/swift2.gif" alt="Demo 2" width="45%">
-</p>
+- Diagnostics screen
+- Touch test screen
 
----
+These are meant to make field troubleshooting easier on the small CYD display.
 
-## Acknowledgments
+### GPS Support
 
-A huge thanks to **@cod5fgzj**, [**smoochiee**](https://github.com/smoochiee), [**ggaljoen**](https://github.com/ggaljoen), [**ATOMNFT**](https://github.com/ATOMNFT), [**jstockdale**](https://github.com/jstockdale), and [**sorinbotirla**](https://github.com/sorinbotirla). And a special mention to [**JustCallMeKoko**](https://github.com/justcallmekoko) for the foundational work on [ESP32Marauder](https://github.com/justcallmekoko/ESP32Marauder).
+GPS support has been tested with a NEO-6M module. The build can detect GPS data and supports GPS-aware Flock/Wardrive workflows.
 
----
+Observed working behavior:
 
-## Disclaimer
+- GPS detected at boot
+- Live NMEA data visible
+- GPS menu reports satellites and fix status
+- Flock and Flock Wardrive appear when GPS lock is available
 
-This project is for educational purposes only. Always obtain proper authorization before testing on networks you don't own or have explicit permission to test. Don't be a dick!
+### Flock-Oriented Passive Recon
+
+This build adds/expands passive Flock-oriented discovery features intended for authorized research and mapping.
+
+Included items:
+
+- Flock Sniff menu item
+- Flock Wardrive menu item
+- WiFi PCAP capture support for Flock sniff sessions
+- CSV/Wigle-style logging through the existing Marauder buffer path
+- KML hit export
+- GPX track export
+- Session summary screen
+- Unique device counters
+- GPS-aware dashboard values
+- Robust tagged SSID parser
+- Probe request support
+- Probe response support
+- Beacon support
+- Hidden SSID review flag
+- Confidence labels for hits
+
+The Flock additions are passive detection/logging features. This repo does not add exploit/RCE behavior.
+
+## Flock Workflow
+
+Recommended field test flow:
+
+1. Insert a working microSD card.
+2. Power on the CYD.
+3. Wait for GPS lock.
+4. Start `Flock Sniff` or `Flock Wardrive`.
+5. Tap the screen to stop.
+6. Review the summary screen.
+7. Tap again to return to the menu.
+8. Pull the SD card to inspect CSV/KML/GPX/PCAP output.
+
+For best validation, compare:
+
+- Whether GPS coordinates appear in exported files
+- Whether unique device counts are reasonable
+- Whether timestamps/session names are consistent
+- Whether KML/GPX output imports cleanly into mapping tools
+
+## Branch And Remote Layout
+
+Recommended remote layout:
+
+```text
+origin   -> erikmorse/ESP32-Marauder-CYD
+upstream -> Fr4nkFletcher/ESP32-Marauder-Cheap-Yellow-Display
+```
+
+Recommended working branch:
+
+```text
+cyd-black-theme
+```
+
+This keeps personal CYD changes separate from the upstream CYD fork.
+
+## Safety And Legal Notice
+
+This project is for educational, defensive, and authorized research use only.
+
+Only test on devices, networks, and locations where you have permission. Local laws and policies may apply to wireless scanning, packet capture, and signal collection.
+
+## Status
+
+Known working on the local CYDUSB2 setup:
+
+- Display
+- Resistive touch
+- Black UI theme
+- SD card detection
+- GPS detection and lock
+- Flock Sniff menu
+- Flock Wardrive menu
+- Faster PlatformIO upload at `460800`
+
+Known inconvenience:
+
+- GPS should be unplugged before uploading firmware over USB.
