@@ -1033,7 +1033,26 @@ void WiFiScan::showFlockSummary() {
     display_obj.tft.println("Best RSSI: " + (String)this->flock_strongest_rssi);
     display_obj.tft.println("");
     display_obj.tft.println(this->flock_last_seen.substring(0, 28));
-    delay(1500);
+    display_obj.tft.println("");
+    display_obj.tft.println("Touch to return");
+
+    #if defined(CYD_32CAP) || defined(CYD_35CAP)
+      int16_t t_x[5] = {0, 0, 0, 0, 0};
+      int16_t t_y[5] = {0, 0, 0, 0, 0};
+      delay(300);
+      while (touch.getPoint(t_x, t_y, touch.getSupportTouchPoint()) > 0)
+        delay(25);
+      while (touch.getPoint(t_x, t_y, touch.getSupportTouchPoint()) <= 0)
+        delay(25);
+    #else
+      uint16_t t_x = 0;
+      uint16_t t_y = 0;
+      delay(300);
+      while (display_obj.tft.getTouch(&t_x, &t_y, 600))
+        delay(25);
+      while (!display_obj.tft.getTouch(&t_x, &t_y, 600))
+        delay(25);
+    #endif
   #endif
 }
 
