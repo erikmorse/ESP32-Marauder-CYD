@@ -982,6 +982,8 @@ void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color)
   else if (scan_mode == WIFI_ATTACK_AP_SPAM)
     this->startWiFiAttacks(scan_mode, color, " AP Beacon Spam ");
   else if ((scan_mode == BT_SCAN_ALL) || (scan_mode == BT_SCAN_AIRTAG) || (scan_mode == BT_SCAN_FLIPPER) || (scan_mode == BT_SCAN_FLOCK) || (scan_mode == BT_SCAN_ANALYZER)){
+    if (scan_mode == BT_SCAN_FLOCK)
+      RunProbeScan(scan_mode, color);
     #ifdef HAS_BT
       RunBluetoothScan(scan_mode, color);
     #endif
@@ -1220,7 +1222,8 @@ void WiFiScan::StopScan(uint8_t scan_mode)
       (currentScanMode == WIFI_PACKET_MONITOR) ||
       (currentScanMode == WIFI_SCAN_CHAN_ANALYZER) ||
       (currentScanMode == WIFI_SCAN_PACKET_RATE) ||
-      (currentScanMode == LV_JOIN_WIFI))
+      (currentScanMode == LV_JOIN_WIFI) ||
+      (currentScanMode == BT_SCAN_FLOCK))
   {
     this->shutdownWiFi();
      #ifdef HAS_SCREEN
@@ -1240,9 +1243,10 @@ void WiFiScan::StopScan(uint8_t scan_mode)
       this->max_rssi = -128;
     #endif
   }
-  else if ((currentScanMode == BT_SCAN_ALL) ||
+  if ((currentScanMode == BT_SCAN_ALL) ||
            (currentScanMode == BT_SCAN_AIRTAG) ||
            (currentScanMode == BT_SCAN_FLIPPER) ||
+           (currentScanMode == BT_SCAN_FLOCK) ||
            (currentScanMode == BT_ATTACK_SOUR_APPLE) ||
            (currentScanMode == BT_ATTACK_SWIFTPAIR_SPAM) ||
            (currentScanMode == BT_ATTACK_SPAM_ALL) ||
@@ -3196,6 +3200,8 @@ void WiFiScan::RunProbeScan(uint8_t scan_mode, uint16_t color)
 {
   if (scan_mode == WIFI_SCAN_PROBE)
     startPcap("probe");
+  else if (scan_mode == BT_SCAN_FLOCK)
+    startPcap("flock");
   else if (scan_mode == WIFI_SCAN_STATION_WAR_DRIVE) {
     #ifdef HAS_GPS
       if (gps_obj.getGpsModuleStatus()) {
@@ -3232,7 +3238,10 @@ void WiFiScan::RunProbeScan(uint8_t scan_mode, uint16_t color)
     display_obj.tft.setTextColor(TFT_BLACK, color);
     #ifdef HAS_FULL_SCREEN
       display_obj.tft.fillRect(0,16,TFT_WIDTH,16, color);
-      display_obj.tft.drawCentreString(text_table4[40],TFT_WIDTH/2,16,2);
+      if (scan_mode == BT_SCAN_FLOCK)
+        display_obj.tft.drawCentreString("Flock Sniff",TFT_WIDTH/2,16,2);
+      else
+        display_obj.tft.drawCentreString(text_table4[40],TFT_WIDTH/2,16,2);
     #endif
     #if defined(HAS_ILI9341) || defined(HAS_ST7796) || defined(HAS_ST7789)
       display_obj.touchToExit();
@@ -4922,6 +4931,7 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
   int len = snifferPacket->rx_ctrl.sig_len;
 
   String display_string = "";
+  String essid = "";
 
   if (type == WIFI_PKT_MGMT)
   {
@@ -4937,6 +4947,85 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
     //#else
     int buf = 0;
     //#endif
+
+    if (wifi_scan_obj.currentScanMode == BT_SCAN_FLOCK) {
+      bool do_write = false;
+      bool is_probe = snifferPacket->payload[0] == 0x40;
+      bool is_beacon = snifferPacket->payload[0] == 0x80;
+      uint8_t addr_bytes[6];
+      char addr[] = "00:00:00:00:00:00";
+
+      if (is_probe && len > 26) {
+        memcpy(addr_bytes, &snifferPacket->payload[10], 6);
+        getMAC(addr, snifferPacket->payload, 10);
+
+        uint8_t ssid_len = snifferPacket->payload[25];
+        if (ssid_len > len - 26)
+          ssid_len = len - 26;
+
+        for (int i = 0; i < ssid_len; i++)
+          essid.concat((char)snifferPacket->payload[26 + i]);
+      }
+      else if (is_beacon && len > 38) {
+        memcpy(addr_bytes, &snifferPacket->payload[10], 6);
+        getMAC(addr, snifferPacket->payload, 10);
+
+        uint8_t ssid_len = snifferPacket->payload[37];
+        if (ssid_len > len - 38)
+          ssid_len = len - 38;
+
+        for (int i = 0; i < ssid_len; i++)
+          essid.concat((char)snifferPacket->payload[38 + i]);
+      }
+      else {
+        return;
+      }
+
+      for (int i = 0; i < 5; i++) {
+        if (strcasestr(essid.c_str(), wifi_scan_obj.flock_ssid[i])) {
+          do_write = true;
+          break;
+        }
+      }
+
+      if (!do_write && wifi_scan_obj.checkFlockOUI(addr_bytes))
+        do_write = true;
+
+      if (do_write) {
+        wifi_scan_obj.flock_devices++;
+
+        #ifdef HAS_SCREEN
+          display_string.concat(is_probe ? MAGENTA_KEY : GREEN_KEY);
+          display_string.concat((String)snifferPacket->rx_ctrl.rssi);
+          display_string.concat(" ");
+          display_string.concat(addr);
+          display_string.concat(is_probe ? " -> " : " AP ");
+          display_string.concat(essid.length() ? essid : "(hidden)");
+
+          int temp_len = display_string.length();
+          for (int i = 0; i < 40 - temp_len; i++)
+            display_string.concat(" ");
+
+          display_obj.display_buffer->add(display_string);
+        #endif
+
+        Serial.print("Flock WiFi ");
+        Serial.print(is_probe ? "probe " : "beacon ");
+        Serial.print("RSSI: ");
+        Serial.print(snifferPacket->rx_ctrl.rssi);
+        Serial.print(" Ch: ");
+        Serial.print(snifferPacket->rx_ctrl.channel);
+        Serial.print(" MAC: ");
+        Serial.print(addr);
+        Serial.print(" SSID: ");
+        Serial.println(essid.length() ? essid : "(hidden)");
+
+        buffer_obj.append(snifferPacket, len);
+      }
+
+      return;
+    }
+
     if ((snifferPacket->payload[0] == 0x40) && (buf == 0))
     {
       if (wifi_scan_obj.currentScanMode == WIFI_SCAN_PROBE) {
@@ -6837,7 +6926,8 @@ void WiFiScan::main(uint32_t currentTime)
   (currentScanMode == WIFI_SCAN_PWN) ||
   (currentScanMode == WIFI_SCAN_DEAUTH) ||
   (currentScanMode == WIFI_SCAN_STATION_WAR_DRIVE) ||
-  (currentScanMode == WIFI_SCAN_ALL))
+  (currentScanMode == WIFI_SCAN_ALL) ||
+  (currentScanMode == BT_SCAN_FLOCK))
   {
     if (currentTime - initTime >= this->channel_hop_delay * 1000)
     {
