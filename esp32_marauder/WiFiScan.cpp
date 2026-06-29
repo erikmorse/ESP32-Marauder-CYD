@@ -700,8 +700,35 @@ bool WiFiScan::flockSSIDIsHidden(const String& ssid) {
 }
 
 bool WiFiScan::isFlockCamera(const uint8_t* payload, size_t len, const String& name, String* serial_out) {
+  bool name_match = false;
+
+  if (name.length() > 0) {
+    if (strcasestr(name.c_str(), "FS Ext Battery") ||
+        strcasestr(name.c_str(), "Penguin") ||
+        strcasestr(name.c_str(), "Flock") ||
+        strcasestr(name.c_str(), "Pigvision")) {
+      name_match = true;
+    }
+  }
+
   if (payload == nullptr || len < 4)
-    return false;
+    return name_match;
+
+  if (serial_out != nullptr)
+    *serial_out = "";
+
+  if (!name_match && name.length() == 10) {
+    bool allDigits = true;
+    for (int i = 0; i < name.length(); i++) {
+      char c = name.charAt(i);
+      if (c < '0' || c > '9') {
+        allDigits = false;
+        break;
+      }
+    }
+    if (allDigits)
+      name_match = true;
+  }
 
   bool hasXuntongMfg = false;
   size_t mfgIndex = 0;
@@ -715,49 +742,14 @@ bool WiFiScan::isFlockCamera(const uint8_t* payload, size_t len, const String& n
   }
 
   if (!hasXuntongMfg)
-    return false;
+    return name_match;
 
-  bool penguin = false;
+  if (serial_out == nullptr)
+    return true;
 
-  if (name.length() > 0) {
-    if (name.startsWith("Penguin-") && name.length() == 18) {
-      bool allDigits = true;
-      for (int i = 8; i < name.length(); i++) {
-        char c = name.charAt(i);
-        if (c < '0' || c > '9') {
-          allDigits = false;
-          break;
-        }
-      }
-      if (allDigits)
-        penguin = true;
-    }
-
-    if (name == "FS Ext Battery")
-      penguin = true;
-
-    if (name.length() == 10) {
-      bool allDigits = true;
-      for (int i = 0; i < name.length(); i++) {
-        char c = name.charAt(i);
-        if (c < '0' || c > '9') {
-          allDigits = false;
-          break;
-        }
-      }
-      if (allDigits)
-        penguin = true;
-    }
-  }
-
-  if (!penguin && name.length() != 0)
-    return false;
-
-  if (serial_out != nullptr) {
-    *serial_out = "";
-
-    if (mfgIndex > 0) {
-      uint8_t adLen = payload[mfgIndex - 1];
+  if (mfgIndex > 0) {
+    uint8_t adLen = payload[mfgIndex - 1];
+    if (adLen >= 3) {
       size_t adStart = mfgIndex - 1;
       size_t adEnd = adStart + adLen;
       if (adEnd > len)
