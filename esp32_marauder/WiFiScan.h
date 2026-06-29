@@ -429,6 +429,7 @@ class WiFiScan
     String flockTimestampSuffix();
     String flockGpxTimestamp();
     String flockExportFileName(String prefix, String ext);
+    String flockCsvEscape(const String& value);
     void beginFlockMapExports();
 
   public:
@@ -438,6 +439,7 @@ class WiFiScan
     void resetFlockSession();
     bool recordFlockDevice(uint8_t mac[6], int rssi, const String& source, const String& label);
     void appendFlockMapHit(const String& mac, const String& ssid, int channel, int rssi, const String& type);
+    void appendFlockReviewRow(const String& mac, const String& ssid, int channel, int rssi, const String& rule, const String& confidence);
     void appendFlockTrackPoint();
     void closeFlockMapExports();
     void drawFlockDashboard();
@@ -469,6 +471,7 @@ class WiFiScan
     String flock_session_suffix = "";
     String flock_kml_file = "";
     String flock_gpx_file = "";
+    String flock_review_file = "";
     bool flock_map_exports_open = false;
 
     uint8_t set_channel = 1;

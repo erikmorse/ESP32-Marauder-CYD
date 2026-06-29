@@ -860,6 +860,15 @@ String WiFiScan::flockExportFileName(String prefix, String ext) {
   #endif
 }
 
+String WiFiScan::flockCsvEscape(const String& value) {
+  String escaped = value;
+  escaped.replace("\"", "\"\"");
+  if ((escaped.indexOf(',') >= 0) || (escaped.indexOf('"') >= 0) ||
+      (escaped.indexOf('\n') >= 0) || (escaped.indexOf('\r') >= 0))
+    escaped = "\"" + escaped + "\"";
+  return escaped;
+}
+
 void WiFiScan::resetFlockSession() {
   this->clearMacHistory();
   this->flock_devices = 0;
@@ -871,6 +880,7 @@ void WiFiScan::resetFlockSession() {
   this->flock_session_suffix = this->flockTimestampSuffix();
   this->flock_kml_file = "";
   this->flock_gpx_file = "";
+  this->flock_review_file = "";
   this->flock_map_exports_open = false;
 }
 
@@ -902,6 +912,7 @@ void WiFiScan::beginFlockMapExports() {
 
     this->flock_kml_file = this->flockExportFileName("flock_wardrive", ".kml");
     this->flock_gpx_file = this->flockExportFileName("flock_track", ".gpx");
+    this->flock_review_file = this->flockExportFileName("flock_review", ".csv");
 
     File kml = SD.open(this->flock_kml_file, FILE_WRITE);
     if (kml) {
@@ -915,6 +926,12 @@ void WiFiScan::beginFlockMapExports() {
       gpx.print("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
       gpx.print("<gpx version=\"1.1\" creator=\"ESP32 Marauder CYD\"><trk><name>Flock Wardrive</name><trkseg>\n");
       gpx.close();
+    }
+
+    File review = SD.open(this->flock_review_file, FILE_WRITE);
+    if (review) {
+      review.print("time,mac,ssid,channel,rssi,rule,confidence,lat,lon,alt,accuracy\n");
+      review.close();
     }
 
     this->flock_map_exports_open = true;
@@ -961,6 +978,40 @@ void WiFiScan::appendFlockMapHit(const String& mac, const String& ssid, int chan
       gpx.print(type + " RSSI " + (String)rssi + " CH " + (String)channel + " " + safe_ssid);
       gpx.print("</desc></trkpt>\n");
       gpx.close();
+    }
+  #endif
+}
+
+void WiFiScan::appendFlockReviewRow(const String& mac, const String& ssid, int channel, int rssi, const String& rule, const String& confidence) {
+  #if defined(HAS_SD) && defined(HAS_GPS)
+    if (!this->flock_map_exports_open || !sd_obj.supported || !this->flock_review_file.length())
+      return;
+
+    File review = SD.open(this->flock_review_file, FILE_APPEND);
+    if (review) {
+      review.print(this->flockCsvEscape(gps_obj.getDatetime()));
+      review.print(",");
+      review.print(this->flockCsvEscape(mac));
+      review.print(",");
+      review.print(this->flockCsvEscape(ssid));
+      review.print(",");
+      review.print(channel);
+      review.print(",");
+      review.print(rssi);
+      review.print(",");
+      review.print(this->flockCsvEscape(rule));
+      review.print(",");
+      review.print(this->flockCsvEscape(confidence));
+      review.print(",");
+      review.print(gps_obj.getLat());
+      review.print(",");
+      review.print(gps_obj.getLon());
+      review.print(",");
+      review.print(gps_obj.getAlt());
+      review.print(",");
+      review.print(gps_obj.getAccuracy());
+      review.print("\n");
+      review.close();
     }
   #endif
 }
@@ -3289,9 +3340,6 @@ void WiFiScan::executeWarDrive() {
             flock_rule = this->flockSSIDRule(ssid);
           bool flock_match = flock_rule.length() > 0;
 
-          if ((this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) && !flock_match)
-            continue;
-
           if (this->seen_mac(this_bssid_raw))
             continue;
 
@@ -3319,6 +3367,18 @@ void WiFiScan::executeWarDrive() {
           }
           else {
             display_string.concat(" | GPS: No Fix");
+          }
+
+          if (this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) {
+            this->appendFlockReviewRow(WiFi.BSSIDstr(i),
+                                       ssid,
+                                       WiFi.channel(i),
+                                       WiFi.RSSI(i),
+                                       flock_match ? flock_rule : "no_match",
+                                       flock_match ? "MATCH" : "REVIEW");
+
+            if (!flock_match)
+              continue;
           }
 
           int temp_len = display_string.length();
