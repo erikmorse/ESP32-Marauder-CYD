@@ -427,6 +427,7 @@ class WiFiScan
     bool extractTaggedSSID(const uint8_t* payload, int len, uint16_t tagged_offset, String& ssid);
     bool flockSSIDIsHidden(const String& ssid);
     String flockTimestampSuffix();
+    String flockGpxTimestamp();
     String flockExportFileName(String prefix, String ext);
     void beginFlockMapExports();
 

@@ -823,6 +823,26 @@ String WiFiScan::flockTimestampSuffix() {
   return clean.length() ? clean : "session_" + (String)(millis() / 1000);
 }
 
+String WiFiScan::flockGpxTimestamp() {
+  #ifdef HAS_GPS
+    String stamp = gps_obj.getDatetime();
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+
+    if (sscanf(stamp.c_str(), "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second) == 6) {
+      char formatted[21] = {};
+      snprintf(formatted, sizeof(formatted), "%04d-%02d-%02dT%02d:%02d:%02dZ", year, month, day, hour, minute, second);
+      return String(formatted);
+    }
+  #endif
+
+  return "";
+}
+
 String WiFiScan::flockExportFileName(String prefix, String ext) {
   #ifdef HAS_SD
     String base = "/" + prefix + "_" + this->flock_session_suffix;
@@ -959,7 +979,7 @@ void WiFiScan::appendFlockTrackPoint() {
       gpx.print("\"><ele>");
       gpx.print(gps_obj.getAlt());
       gpx.print("</ele><time>");
-      gpx.print(gps_obj.getDatetime());
+      gpx.print(this->flockGpxTimestamp());
       gpx.print("</time></trkpt>\n");
       gpx.close();
     }
