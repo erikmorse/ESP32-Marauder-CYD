@@ -72,6 +72,7 @@ class GpsInterface {
 
     String generateGXgga();
     String generateGXrmc();
+    bool syncSystemClockFromGps();
 
   private:
     enum type_t {
@@ -99,6 +100,7 @@ class GpsInterface {
     
     bool gps_enabled = false;
     bool good_fix = false;
+    bool system_clock_synced = false;
     char nav_system='\0';
     uint8_t num_sats = 0;
 

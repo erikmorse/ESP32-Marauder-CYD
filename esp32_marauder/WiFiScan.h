@@ -261,7 +261,7 @@ class WiFiScan
 
     char* prefix = "G";
 
-    uint8_t flock_oui_list[27][3] = {
+    uint8_t flock_oui_list[40][3] = {
       {0x58, 0x8E, 0x81},
       {0xCC, 0xCC, 0xCC},
       {0xEC, 0x1B, 0xBD},
@@ -288,7 +288,20 @@ class WiFiScan
       {0x00, 0xF4, 0x8D},
       {0xD0, 0x39, 0x57},
       {0xE8, 0xD0, 0xFC},
-      {0xB4, 0x1E, 0x52}
+      {0xB4, 0x1E, 0x52},
+      {0xB8, 0x35, 0x32},
+      {0xC0, 0x35, 0x32},
+      {0x24, 0xB2, 0xB9},
+      {0xE0, 0x4F, 0x43},
+      {0xB8, 0x1E, 0xA4},
+      {0x70, 0x08, 0x94},
+      {0x3C, 0x71, 0xBF},
+      {0x58, 0x00, 0xE3},
+      {0x5C, 0x93, 0xA2},
+      {0x64, 0x6E, 0x69},
+      {0x48, 0x27, 0xEA},
+      {0xA4, 0xCF, 0x12},
+      {0x82, 0x6B, 0xF2}
     };
 
     typedef struct
@@ -423,6 +436,7 @@ class WiFiScan
     bool checkMem();
     void parseBSSID(const char* bssidStr, uint8_t* bssid);
     String flockOUIRule(const uint8_t mac[6]);
+    String flockFrameOUIRule(const uint8_t* payload, int len, bool include_bssid, uint8_t matched_mac[6], char matched_addr[18]);
     String flockSSIDRule(const String& ssid);
     bool extractTaggedSSID(const uint8_t* payload, int len, uint16_t tagged_offset, String& ssid);
     bool flockSSIDIsHidden(const String& ssid);
@@ -441,6 +455,7 @@ class WiFiScan
     void appendFlockMapHit(const String& mac, const String& ssid, int channel, int rssi, const String& type);
     void appendFlockReviewRow(const String& mac, const String& ssid, int channel, int rssi, const String& rule, const String& confidence);
     void appendFlockTrackPoint();
+    void appendFlockKmlTrackPoint();
     void closeFlockMapExports();
     void drawFlockDashboard();
     void showFlockSummary();

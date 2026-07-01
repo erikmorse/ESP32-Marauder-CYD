@@ -592,12 +592,16 @@ String WiFiScan::flockOUIRule(const uint8_t mac[6]) {
     {0x94, 0x34, 0x69}, {0xB4, 0xE3, 0xF9}, {0x70, 0xC9, 0x4E}, {0x3C, 0x91, 0x80},
     {0xD8, 0xF3, 0xBC}, {0x80, 0x30, 0x49}, {0x14, 0x5A, 0xFC}, {0x74, 0x4C, 0xA1},
     {0x08, 0x3A, 0x88}, {0x9C, 0x2F, 0x9D}, {0x94, 0x08, 0x53}, {0xE4, 0xAA, 0xEA},
-    {0xB4, 0x1E, 0x52}
+    {0xF4, 0x6A, 0xDD}, {0xF8, 0xA2, 0xD6}, {0x24, 0xB2, 0xB9}, {0x00, 0xF4, 0x8D},
+    {0xD0, 0x39, 0x57}, {0xE8, 0xD0, 0xFC}, {0xE0, 0x4F, 0x43}, {0xB8, 0x1E, 0xA4},
+    {0x70, 0x08, 0x94}, {0x3C, 0x71, 0xBF}, {0x58, 0x00, 0xE3},
+    {0x5C, 0x93, 0xA2}, {0x64, 0x6E, 0x69}, {0x48, 0x27, 0xEA},
+    {0xA4, 0xCF, 0x12}, {0x82, 0x6B, 0xF2}, {0xB4, 0x1E, 0x52}, {0xB8, 0x35, 0x32},
+    {0xC0, 0x35, 0x32}
   };
 
   static const uint8_t mfr_oui[][3] = {
-    {0xF4, 0x6A, 0xDD}, {0xF8, 0xA2, 0xD6}, {0xE0, 0x0A, 0xF6},
-    {0x00, 0xF4, 0x8D}, {0xD0, 0x39, 0x57}, {0xE8, 0xD0, 0xFC}
+    {0xE0, 0x0A, 0xF6}
   };
 
   static const uint8_t sound_oui[][3] = {
@@ -617,6 +621,34 @@ String WiFiScan::flockOUIRule(const uint8_t mac[6]) {
   for (size_t i = 0; i < sizeof(sound_oui) / sizeof(sound_oui[0]); i++) {
     if (memcmp(mac, sound_oui[i], 3) == 0)
       return "oui_sound";
+  }
+
+  return "";
+}
+
+String WiFiScan::flockFrameOUIRule(const uint8_t* payload, int len, bool include_bssid, uint8_t matched_mac[6], char matched_addr[18]) {
+  const uint16_t offsets[] = {10, 4, 16};
+  const char* labels[] = {"addr2", "addr1", "addr3"};
+
+  for (uint8_t i = 0; i < 3; i++) {
+    if ((i == 2) && !include_bssid)
+      continue;
+
+    uint16_t offset = offsets[i];
+    if (len < offset + 6)
+      continue;
+
+    const uint8_t* mac = payload + offset;
+    if (mac[0] & 0x01)
+      continue;
+
+    String rule = this->flockOUIRule(mac);
+    if (rule.length()) {
+      memcpy(matched_mac, mac, 6);
+      snprintf(matched_addr, 18, "%02x:%02x:%02x:%02x:%02x:%02x",
+               mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+      return rule + "_" + labels[i];
+    }
   }
 
   return "";
@@ -932,7 +964,8 @@ void WiFiScan::beginFlockMapExports() {
 
 void WiFiScan::appendFlockMapHit(const String& mac, const String& ssid, int channel, int rssi, const String& type) {
   #if defined(HAS_SD) && defined(HAS_GPS)
-    if (!this->flock_map_exports_open || !sd_obj.supported || !gps_obj.getFixStatus())
+    if (!this->flock_map_exports_open || !sd_obj.supported || !gps_obj.getFixStatus() ||
+        !this->flock_kml_file.length() || !this->flock_gpx_file.length())
       return;
 
     String safe_ssid = ssid;
@@ -1010,8 +1043,11 @@ void WiFiScan::appendFlockReviewRow(const String& mac, const String& ssid, int c
 
 void WiFiScan::appendFlockTrackPoint() {
   #if defined(HAS_SD) && defined(HAS_GPS)
-    if (!this->flock_map_exports_open || !sd_obj.supported || !gps_obj.getFixStatus())
+    if (!this->flock_map_exports_open || !sd_obj.supported || !gps_obj.getFixStatus() ||
+        !this->flock_gpx_file.length())
       return;
+
+    this->appendFlockKmlTrackPoint();
 
     File gpx = SD.open(this->flock_gpx_file, FILE_APPEND);
     if (gpx) {
@@ -1025,6 +1061,28 @@ void WiFiScan::appendFlockTrackPoint() {
       gpx.print(this->flockGpxTimestamp());
       gpx.print("</time></trkpt>\n");
       gpx.close();
+    }
+  #endif
+}
+
+void WiFiScan::appendFlockKmlTrackPoint() {
+  #if defined(HAS_SD) && defined(HAS_GPS)
+    if (!this->flock_map_exports_open || !sd_obj.supported || !gps_obj.getFixStatus() ||
+        !this->flock_kml_file.length())
+      return;
+
+    File kml = SD.open(this->flock_kml_file, FILE_APPEND);
+    if (kml) {
+      kml.print("<Placemark><name>Track ");
+      kml.print(this->flockGpxTimestamp());
+      kml.print("</name><Point><coordinates>");
+      kml.print(gps_obj.getLon());
+      kml.print(",");
+      kml.print(gps_obj.getLat());
+      kml.print(",");
+      kml.print(gps_obj.getAlt());
+      kml.print("</coordinates></Point></Placemark>\n");
+      kml.close();
     }
   #endif
 }
@@ -1052,8 +1110,9 @@ void WiFiScan::closeFlockMapExports() {
 
 void WiFiScan::drawFlockDashboard() {
   #ifdef HAS_SCREEN
-    display_obj.tft.fillRect(0, 32, TFT_WIDTH, 16, TFT_BLACK);
+    display_obj.tft.fillRect(0, 32, TFT_WIDTH, 32, TFT_BLACK);
     display_obj.tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    display_obj.tft.setTextSize(1);
     display_obj.tft.setCursor(0, 34);
     display_obj.tft.print("U:");
     display_obj.tft.print(this->flock_unique_devices);
@@ -1063,6 +1122,7 @@ void WiFiScan::drawFlockDashboard() {
     display_obj.tft.print(this->flock_ble_hits);
     display_obj.tft.print(" W:");
     display_obj.tft.print(this->flock_wifi_hits);
+    display_obj.tft.setCursor(0, 50);
     display_obj.tft.print(" R:");
     display_obj.tft.print(this->flock_strongest_rssi);
     #ifdef HAS_GPS
@@ -3442,7 +3502,7 @@ void WiFiScan::RunBeaconScan(uint8_t scan_mode, uint16_t color)
   #endif
   
   #ifdef HAS_SCREEN
-    display_obj.TOP_FIXED_AREA_2 = 48;
+    display_obj.TOP_FIXED_AREA_2 = (scan_mode == WIFI_SCAN_FLOCK_WAR_DRIVE) ? 64 : 48;
     display_obj.tteBar = true;
     display_obj.print_delay_1 = 15;
     display_obj.print_delay_2 = 10;
@@ -3695,7 +3755,7 @@ void WiFiScan::RunProbeScan(uint8_t scan_mode, uint16_t color)
   #endif
   
   #ifdef HAS_SCREEN
-    display_obj.TOP_FIXED_AREA_2 = 48;
+    display_obj.TOP_FIXED_AREA_2 = (scan_mode == BT_SCAN_FLOCK) ? 64 : 48;
     display_obj.tteBar = true;
     display_obj.print_delay_1 = 15;
     display_obj.print_delay_2 = 10;
@@ -5420,7 +5480,7 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
       bool is_probe = subtype == 0x04;
       bool is_probe_resp = subtype == 0x05;
       bool is_beacon = subtype == 0x08;
-      uint8_t addr_bytes[6];
+      uint8_t addr_bytes[6] = {};
       char addr[] = "00:00:00:00:00:00";
       String frame_name = "";
       String ssid_rule = "";
@@ -5455,7 +5515,11 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
       if (!hidden_flag)
         ssid_rule = wifi_scan_obj.flockSSIDRule(essid);
 
-      oui_rule = wifi_scan_obj.flockOUIRule(addr_bytes);
+      oui_rule = wifi_scan_obj.flockFrameOUIRule(snifferPacket->payload,
+                                                 len,
+                                                 !is_probe,
+                                                 addr_bytes,
+                                                 addr);
       match_rule = ssid_rule.length() ? ssid_rule : oui_rule;
 
       if (hidden_flag && oui_rule.length())

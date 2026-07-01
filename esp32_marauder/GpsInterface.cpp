@@ -2,6 +2,9 @@
 
 #ifdef HAS_GPS
 
+#include <sys/time.h>
+#include <time.h>
+
 extern GpsInterface gps_obj;
 
 char nmeaBuffer[100];
@@ -490,6 +493,37 @@ String GpsInterface::dt_string_from_gps(){
   return datetime;
 }
 
+bool GpsInterface::syncSystemClockFromGps() {
+  if (this->system_clock_synced || !nmea.isValid() || nmea.getYear() < 2020)
+    return this->system_clock_synced;
+
+  struct tm gps_time = {};
+  gps_time.tm_year = nmea.getYear() - 1900;
+  gps_time.tm_mon = nmea.getMonth() - 1;
+  gps_time.tm_mday = nmea.getDay();
+  gps_time.tm_hour = nmea.getHour();
+  gps_time.tm_min = nmea.getMinute();
+  gps_time.tm_sec = nmea.getSecond();
+  gps_time.tm_isdst = 0;
+
+  setenv("TZ", "UTC0", 1);
+  tzset();
+
+  time_t epoch = mktime(&gps_time);
+  if (epoch <= 0)
+    return false;
+
+  struct timeval now = {};
+  now.tv_sec = epoch;
+
+  if (settimeofday(&now, NULL) == 0) {
+    this->system_clock_synced = true;
+    Serial.println("System clock synced from GPS");
+  }
+
+  return this->system_clock_synced;
+}
+
 void GpsInterface::setGPSInfo() {
   String nmea_sentence = String(nmea.getSentence());
   if(nmea_sentence != "") this->nmea_sentence = nmea_sentence;
@@ -499,6 +533,7 @@ void GpsInterface::setGPSInfo() {
   this->num_sats = nmea.getNumSatellites();
 
   this->datetime = this->dt_string_from_gps();
+  this->syncSystemClockFromGps();
 
   this->lat = String((float)nmea.getLatitude()/1000000, 7);
   this->lon = String((float)nmea.getLongitude()/1000000, 7);
