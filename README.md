@@ -1,6 +1,6 @@
 # ESP32 Marauder CYD
 
-ESP32 Marauder build customized for the Cheap Yellow Display ESP32-2432S028R / CYDUSB2 with ILI9341 display, XPT2046 resistive touch, GPS, SD logging, dark UI, and expanded passive Flock detection tools.
+ESP32 Marauder build customized for the Cheap Yellow Display ESP32-2432S028R / CYDUSB2 with ILI9341 display, XPT2046 resistive touch, GPS, SD logging, dark UI, and expanded passive Flock detection/survey tools.
 
 This repo is a local CYD-focused PlatformIO workspace. It intentionally keeps the CYD-specific fork separate from the generic JustCallMeKoko ESP32 Marauder source.
 
@@ -132,7 +132,7 @@ Observed working behavior:
 - GPS detected at boot
 - Live NMEA data visible
 - GPS menu reports satellites and fix status
-- Flock and Flock Wardrive appear when GPS lock is available
+- Flock Survey and Flock WiFi Wardrive appear when GPS lock is available
 
 ### Flock-Oriented Passive Recon
 
@@ -141,13 +141,18 @@ This build adds/expands passive Flock-oriented discovery features intended for a
 Included items:
 
 - Flock Sniff menu item
-- Flock Wardrive menu item
+- Flock Survey menu item for combined BLE + WiFi field checks
+- Flock WiFi Wardrive menu item for WiFi-only review/export runs
 - WiFi PCAP capture support for Flock sniff sessions
 - CSV/Wigle-style logging through the existing Marauder buffer path
+- CSV review logs for matched and rejected WiFi observations
 - KML hit export
 - GPX track export
+- BLE hit export to CSV/KML/GPX when GPS/SD are available
+- Raw WiFi Flock hit export from Flock Sniff sessions
 - Session summary screen
 - Unique device counters
+- Separate BLE and WiFi hit counters
 - GPS-aware dashboard values
 - Robust tagged SSID parser
 - Probe request support
@@ -155,6 +160,29 @@ Included items:
 - Beacon support
 - Hidden SSID review flag
 - Confidence labels for hits
+- XUNTONG manufacturer-data BLE matching
+- Numeric Penguin battery-name matching
+- Known Flock WiFi OUI and SSID pattern matching
+
+Flock-related modes:
+
+- `Flock Survey`: recommended driving mode. Runs WiFi AP checks and BLE Flock matching in one GPS-aware session, then exports hits and review data.
+- `Flock Sniff`: passive BLE plus raw WiFi management-frame sniffing. Useful when parked near a known camera for a control test.
+- `Flock WiFi Wardrive`: WiFi-only wardrive/review mode. Useful for checking visible APs, but not sufficient by itself when cameras do not advertise WiFi.
+
+The Flock dashboard counters count actual matches only. Non-matching WiFi observations are still written to the review CSV, but they do not increment Flock hit totals.
+
+Flock export files use mode-specific names:
+
+- `flock_survey_*.kml`
+- `flock_survey_track_*.gpx`
+- `flock_survey_review_*.csv`
+- `flock_wifi_wardrive_*.kml`
+- `flock_wifi_wardrive_track_*.gpx`
+- `flock_wifi_wardrive_review_*.csv`
+- `flock_sniff_*.kml`
+- `flock_sniff_track_*.gpx`
+- `flock_sniff_review_*.csv`
 
 The Flock additions are passive detection/logging features. This repo does not add exploit/RCE behavior.
 
@@ -165,11 +193,20 @@ Recommended field test flow:
 1. Insert a working microSD card.
 2. Power on the CYD.
 3. Wait for GPS lock.
-4. Start `Flock Sniff` or `Flock Wardrive`.
+4. Start `Flock Survey` for normal driving.
 5. Tap the screen to stop.
 6. Review the summary screen.
 7. Tap again to return to the menu.
 8. Pull the SD card to inspect CSV/KML/GPX/PCAP output.
+
+Recommended driving notes:
+
+- Use `Flock Survey` first. It has the widest passive coverage.
+- Keep the device near a window with a clear GPS/radio view.
+- Drive slowly and, when safe, make more than one pass.
+- Let the scan run before and after passing the camera because BLE advertisements can be bursty.
+- Use `Flock Sniff` while parked near a known camera for a 2-5 minute control test.
+- Use `Flock WiFi Wardrive` only when you specifically want WiFi AP review data.
 
 For best validation, compare:
 
@@ -177,6 +214,8 @@ For best validation, compare:
 - Whether unique device counts are reasonable
 - Whether timestamps/session names are consistent
 - Whether KML/GPX output imports cleanly into mapping tools
+- Whether review CSV rows are `MATCH` or `REVIEW`
+- Whether KML contains hit placemarks in addition to track placemarks
 
 
 ## Safety And Legal Notice
@@ -195,7 +234,10 @@ Known working on the local CYDUSB2 setup:
 - SD card detection
 - GPS detection and lock
 - Flock Sniff menu
-- Flock Wardrive menu
+- Flock Survey menu
+- Flock WiFi Wardrive menu
+- BLE Flock hit export to CSV/KML/GPX
+- WiFi review CSV with non-match rows preserved
 - Faster PlatformIO upload at `460800`
 
 Known inconvenience:
