@@ -844,6 +844,7 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_AP) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_WAR_DRIVE) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+            (wifi_scan_obj.currentScanMode == WIFI_SCAN_FLOCK_SURVEY) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_EVIL_PORTAL) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_TARGET_AP) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_TARGET_AP_FULL) ||
@@ -915,6 +916,7 @@ void MenuFunctions::main(uint32_t currentTime)
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_AP) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_WAR_DRIVE) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+            (wifi_scan_obj.currentScanMode == WIFI_SCAN_FLOCK_SURVEY) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_EVIL_PORTAL) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_SIG_STREN) ||
             (wifi_scan_obj.currentScanMode == WIFI_SCAN_TARGET_AP) ||
@@ -2450,7 +2452,12 @@ void MenuFunctions::RunSetup()
   });
   #ifdef HAS_GPS
     if (gps_obj.getGpsModuleStatus()) {
-      this->addNodes(&bluetoothSnifferMenu, "Flock Wardrive", TFTORANGE, NULL, GPS_MENU, [this]() {
+      this->addNodes(&bluetoothSnifferMenu, "Flock Survey", TFTORANGE, NULL, GPS_MENU, [this]() {
+        display_obj.clearScreen();
+        this->drawStatusBar();
+        wifi_scan_obj.StartScan(WIFI_SCAN_FLOCK_SURVEY, TFT_ORANGE);
+      });
+      this->addNodes(&bluetoothSnifferMenu, "Flock WiFi Wardrive", TFTORANGE, NULL, GPS_MENU, [this]() {
         display_obj.clearScreen();
         this->drawStatusBar();
         wifi_scan_obj.StartScan(WIFI_SCAN_FLOCK_WAR_DRIVE, TFT_ORANGE);

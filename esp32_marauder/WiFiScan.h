@@ -106,6 +106,7 @@
 #define WIFI_SCAN_AP_STA 49
 #define BT_SCAN_FLOCK 50
 #define WIFI_SCAN_FLOCK_WAR_DRIVE 51
+#define WIFI_SCAN_FLOCK_SURVEY 52
 
 
 #define BASE_MULTIPLIER 4
@@ -435,7 +436,6 @@ class WiFiScan
     void RunEvilPortal(uint8_t scan_mode, uint16_t color);
     bool checkMem();
     void parseBSSID(const char* bssidStr, uint8_t* bssid);
-    String flockOUIRule(const uint8_t mac[6]);
     String flockFrameOUIRule(const uint8_t* payload, int len, bool include_bssid, uint8_t matched_mac[6], char matched_addr[18]);
     String flockSSIDRule(const String& ssid);
     bool extractTaggedSSID(const uint8_t* payload, int len, uint16_t tagged_offset, String& ssid);
@@ -444,11 +444,12 @@ class WiFiScan
     String flockGpxTimestamp();
     String flockExportFileName(String prefix, String ext);
     String flockCsvEscape(const String& value);
-    void beginFlockMapExports();
+    void beginFlockMapExports(const String& prefix, const String& title);
 
   public:
     WiFiScan();
     bool checkFlockOUI(const uint8_t mac[6]);
+    String flockOUIRule(const uint8_t mac[6]);
     bool isFlockCamera(const uint8_t* payload, size_t len, const String& name, String* serial_out);
     void resetFlockSession();
     bool recordFlockDevice(uint8_t mac[6], int rssi, const String& source, const String& label);

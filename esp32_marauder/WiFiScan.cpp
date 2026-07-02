@@ -474,7 +474,8 @@ extern "C" {
             wifi_scan_obj.analyzer_name_update = true;
           }
         }
-        else if (wifi_scan_obj.currentScanMode == BT_SCAN_FLOCK) {
+        else if ((wifi_scan_obj.currentScanMode == BT_SCAN_FLOCK) ||
+                 (wifi_scan_obj.currentScanMode == WIFI_SCAN_FLOCK_SURVEY)) {
           uint8_t* payLoad = advertisedDevice->getPayload();
           size_t len = advertisedDevice->getPayloadLength();
           String name = advertisedDevice->getName().c_str();
@@ -486,10 +487,14 @@ extern "C" {
                  &mac_bytes[0], &mac_bytes[1], &mac_bytes[2],
                  &mac_bytes[3], &mac_bytes[4], &mac_bytes[5]);
 
-          if (wifi_scan_obj.isFlockCamera(payLoad, len, name, &serial) || wifi_scan_obj.checkFlockOUI(mac_bytes)) {
+          bool ble_match = wifi_scan_obj.isFlockCamera(payLoad, len, name, &serial);
+          String oui_rule = wifi_scan_obj.flockOUIRule(mac_bytes);
+
+          if (ble_match || oui_rule.length()) {
             mac.toUpperCase();
             int rssi = advertisedDevice->getRSSI();
             String label = serial.length() ? serial : (name.length() ? name : mac);
+            String rule = serial.length() ? "ble_xuntong_serial" : (ble_match ? "ble_flock" : oui_rule);
             bool is_new = wifi_scan_obj.recordFlockDevice(mac_bytes, rssi, "BLE", label);
 
             Serial.print("Flock BLE RSSI: ");
@@ -502,6 +507,9 @@ extern "C" {
             Serial.print(name);
             Serial.print(" Serial: ");
             Serial.println(serial.length() ? serial : "N/A");
+
+            wifi_scan_obj.appendFlockReviewRow(mac, label, 0, rssi, rule, "MATCH");
+            wifi_scan_obj.appendFlockMapHit(mac, label, 0, rssi, "BLE");
 
             #ifdef HAS_SCREEN
               display_string.concat("Flock ");
@@ -929,26 +937,30 @@ bool WiFiScan::recordFlockDevice(uint8_t mac[6], int rssi, const String& source,
   return is_new;
 }
 
-void WiFiScan::beginFlockMapExports() {
+void WiFiScan::beginFlockMapExports(const String& prefix, const String& title) {
   #if defined(HAS_SD) && defined(HAS_GPS)
     if (!sd_obj.supported || !gps_obj.getGpsModuleStatus())
       return;
 
-    this->flock_kml_file = this->flockExportFileName("flock_wardrive", ".kml");
-    this->flock_gpx_file = this->flockExportFileName("flock_track", ".gpx");
-    this->flock_review_file = this->flockExportFileName("flock_review", ".csv");
+    this->flock_kml_file = this->flockExportFileName(prefix, ".kml");
+    this->flock_gpx_file = this->flockExportFileName(prefix + "_track", ".gpx");
+    this->flock_review_file = this->flockExportFileName(prefix + "_review", ".csv");
 
     File kml = SD.open(this->flock_kml_file, FILE_WRITE);
     if (kml) {
       kml.print("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-      kml.print("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document><name>Flock Wardrive</name>\n");
+      kml.print("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document><name>");
+      kml.print(title);
+      kml.print("</name>\n");
       kml.close();
     }
 
     File gpx = SD.open(this->flock_gpx_file, FILE_WRITE);
     if (gpx) {
       gpx.print("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-      gpx.print("<gpx version=\"1.1\" creator=\"ESP32 Marauder CYD\"><trk><name>Flock Wardrive</name><trkseg>\n");
+      gpx.print("<gpx version=\"1.1\" creator=\"ESP32 Marauder CYD\"><trk><name>");
+      gpx.print(title);
+      gpx.print("</name><trkseg>\n");
       gpx.close();
     }
 
@@ -1484,6 +1496,12 @@ void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color)
       RunBluetoothScan(scan_mode, color);
     #endif
   }
+  else if (scan_mode == WIFI_SCAN_FLOCK_SURVEY) {
+    RunBeaconScan(scan_mode, color);
+    #ifdef HAS_BT
+      RunBluetoothScan(scan_mode, color);
+    #endif
+  }
   else if (scan_mode == BT_ATTACK_SOUR_APPLE) {
     #ifdef HAS_BT
       RunSourApple(scan_mode, color);
@@ -1691,6 +1709,7 @@ bool WiFiScan::shutdownBLE() {
 void WiFiScan::StopScan(uint8_t scan_mode)
 {
   if ((currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+      (currentScanMode == WIFI_SCAN_FLOCK_SURVEY) ||
       (currentScanMode == BT_SCAN_FLOCK)) {
     this->showFlockSummary();
     this->closeFlockMapExports();
@@ -1725,7 +1744,8 @@ void WiFiScan::StopScan(uint8_t scan_mode)
       (currentScanMode == WIFI_SCAN_CHAN_ANALYZER) ||
       (currentScanMode == WIFI_SCAN_PACKET_RATE) ||
       (currentScanMode == LV_JOIN_WIFI) ||
-      (currentScanMode == BT_SCAN_FLOCK))
+      (currentScanMode == BT_SCAN_FLOCK) ||
+      (currentScanMode == WIFI_SCAN_FLOCK_SURVEY))
   {
     this->shutdownWiFi();
      #ifdef HAS_SCREEN
@@ -1749,6 +1769,7 @@ void WiFiScan::StopScan(uint8_t scan_mode)
            (currentScanMode == BT_SCAN_AIRTAG) ||
            (currentScanMode == BT_SCAN_FLIPPER) ||
            (currentScanMode == BT_SCAN_FLOCK) ||
+           (currentScanMode == WIFI_SCAN_FLOCK_SURVEY) ||
            (currentScanMode == BT_ATTACK_SOUR_APPLE) ||
            (currentScanMode == BT_ATTACK_SWIFTPAIR_SPAM) ||
            (currentScanMode == BT_ATTACK_SPAM_ALL) ||
@@ -3366,7 +3387,10 @@ void WiFiScan::executeWarDrive() {
       bool do_save;
       String display_string;
 
-      if (this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE)
+      bool flock_mode = (this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+                        (this->currentScanMode == WIFI_SCAN_FLOCK_SURVEY);
+
+      if (flock_mode)
         this->appendFlockTrackPoint();
       
       while (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
@@ -3395,7 +3419,8 @@ void WiFiScan::executeWarDrive() {
           if (this->seen_mac(this_bssid_raw))
             continue;
 
-          this->save_mac(this_bssid_raw);
+          if (!flock_mode || !flock_match)
+            this->save_mac(this_bssid_raw);
 
           if (ssid != "") {
             display_string.concat(ssid);
@@ -3406,14 +3431,6 @@ void WiFiScan::executeWarDrive() {
 
           if (gps_obj.getFixStatus()) {
             do_save = true;
-            if (this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) {
-              this->flock_devices++;
-              this->flock_unique_devices++;
-              this->flock_wifi_hits++;
-              if (WiFi.RSSI(i) > this->flock_strongest_rssi)
-                this->flock_strongest_rssi = WiFi.RSSI(i);
-              this->flock_last_seen = "WiFi " + flock_rule + " " + (String)WiFi.RSSI(i) + " " + (ssid.length() ? ssid : (String)this_bssid);
-            }
             display_string.concat(" | Lt: " + gps_obj.getLat());
             display_string.concat(" | Ln: " + gps_obj.getLon());
           }
@@ -3421,7 +3438,7 @@ void WiFiScan::executeWarDrive() {
             display_string.concat(" | GPS: No Fix");
           }
 
-          if (this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) {
+          if (flock_mode) {
             this->appendFlockReviewRow(WiFi.BSSIDstr(i),
                                        ssid,
                                        WiFi.channel(i),
@@ -3431,6 +3448,11 @@ void WiFiScan::executeWarDrive() {
 
             if (!flock_match)
               continue;
+
+            this->recordFlockDevice(this_bssid_raw,
+                                    WiFi.RSSI(i),
+                                    "WiFi",
+                                    flock_rule + " " + (ssid.length() ? ssid : (String)this_bssid));
           }
 
           int temp_len = display_string.length();
@@ -3450,7 +3472,8 @@ void WiFiScan::executeWarDrive() {
 
           if (do_save) {
             buffer_obj.append(wardrive_line);
-            if (this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) {
+            if ((this->currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+                (this->currentScanMode == WIFI_SCAN_FLOCK_SURVEY)) {
               this->appendFlockMapHit(WiFi.BSSIDstr(i), ssid, WiFi.channel(i), WiFi.RSSI(i), "WIFI");
             }
           }
@@ -3469,13 +3492,20 @@ void WiFiScan::RunBeaconScan(uint8_t scan_mode, uint16_t color)
 {
   if (scan_mode == WIFI_SCAN_AP)
     startPcap("beacon");
-  else if ((scan_mode == WIFI_SCAN_WAR_DRIVE) || (scan_mode == WIFI_SCAN_FLOCK_WAR_DRIVE)) {
+  else if ((scan_mode == WIFI_SCAN_WAR_DRIVE) ||
+           (scan_mode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+           (scan_mode == WIFI_SCAN_FLOCK_SURVEY)) {
     #ifdef HAS_GPS
       if (gps_obj.getGpsModuleStatus()) {
         if (scan_mode == WIFI_SCAN_FLOCK_WAR_DRIVE) {
           this->resetFlockSession();
-          startLog("flock_wardrive_" + this->flock_session_suffix);
-          this->beginFlockMapExports();
+          startLog("flock_wifi_wardrive_" + this->flock_session_suffix);
+          this->beginFlockMapExports("flock_wifi_wardrive", "Flock WiFi Wardrive");
+        }
+        else if (scan_mode == WIFI_SCAN_FLOCK_SURVEY) {
+          this->resetFlockSession();
+          startLog("flock_survey_" + this->flock_session_suffix);
+          this->beginFlockMapExports("flock_survey", "Flock Survey");
         }
         else
           startLog("wardrive");
@@ -3502,7 +3532,8 @@ void WiFiScan::RunBeaconScan(uint8_t scan_mode, uint16_t color)
   #endif
   
   #ifdef HAS_SCREEN
-    display_obj.TOP_FIXED_AREA_2 = (scan_mode == WIFI_SCAN_FLOCK_WAR_DRIVE) ? 64 : 48;
+    display_obj.TOP_FIXED_AREA_2 = ((scan_mode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+                                    (scan_mode == WIFI_SCAN_FLOCK_SURVEY)) ? 64 : 48;
     display_obj.tteBar = true;
     display_obj.print_delay_1 = 15;
     display_obj.print_delay_2 = 10;
@@ -3518,7 +3549,11 @@ void WiFiScan::RunBeaconScan(uint8_t scan_mode, uint16_t color)
         display_obj.tft.drawCentreString("Wardrive",TFT_WIDTH/2,16,2);
       }
       else if (scan_mode == WIFI_SCAN_FLOCK_WAR_DRIVE) {
-        display_obj.tft.drawCentreString("Flock Wardrive",TFT_WIDTH/2,16,2);
+        display_obj.tft.drawCentreString("Flock WiFi Wardrive",TFT_WIDTH/2,16,2);
+        this->drawFlockDashboard();
+      }
+      else if (scan_mode == WIFI_SCAN_FLOCK_SURVEY) {
+        display_obj.tft.drawCentreString("Flock Survey",TFT_WIDTH/2,16,2);
         this->drawFlockDashboard();
       }
       #if defined(HAS_ILI9341) || defined(HAS_ST7796) || defined(HAS_ST7789)
@@ -3529,7 +3564,9 @@ void WiFiScan::RunBeaconScan(uint8_t scan_mode, uint16_t color)
     display_obj.setupScrollArea(display_obj.TOP_FIXED_AREA_2, BOT_FIXED_AREA);
   #endif
 
-  if ((scan_mode != WIFI_SCAN_WAR_DRIVE) && (scan_mode != WIFI_SCAN_FLOCK_WAR_DRIVE)) {
+  if ((scan_mode != WIFI_SCAN_WAR_DRIVE) &&
+      (scan_mode != WIFI_SCAN_FLOCK_WAR_DRIVE) &&
+      (scan_mode != WIFI_SCAN_FLOCK_SURVEY)) {
   
     esp_wifi_init(&cfg2);
     esp_wifi_set_storage(WIFI_STORAGE_RAM);
@@ -3727,6 +3764,10 @@ void WiFiScan::RunProbeScan(uint8_t scan_mode, uint16_t color)
   else if (scan_mode == BT_SCAN_FLOCK) {
     this->resetFlockSession();
     startPcap("flock_" + this->flock_session_suffix);
+    #if defined(HAS_GPS) && defined(HAS_SD)
+      if (gps_obj.getGpsModuleStatus())
+        this->beginFlockMapExports("flock_sniff", "Flock Sniff");
+    #endif
   }
   else if (scan_mode == WIFI_SCAN_STATION_WAR_DRIVE) {
     #ifdef HAS_GPS
@@ -3891,16 +3932,25 @@ void WiFiScan::RunBluetoothScan(uint8_t scan_mode, uint16_t color)
       display_obj.print_delay_2 = 20;
     #endif
   
-    if ((scan_mode != BT_SCAN_WAR_DRIVE_CONT) && (scan_mode != BT_SCAN_FLOCK)) {
+    if ((scan_mode != BT_SCAN_WAR_DRIVE_CONT) &&
+        (scan_mode != BT_SCAN_FLOCK) &&
+        (scan_mode != WIFI_SCAN_FLOCK_SURVEY)) {
       NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
       NimBLEDevice::setScanDuplicateCacheSize(200);
     }
-    else if ((scan_mode == BT_SCAN_WAR_DRIVE_CONT) || (scan_mode == BT_SCAN_FLOCK) || (scan_mode == BT_SCAN_ANALYZER)) {
+    else if ((scan_mode == BT_SCAN_WAR_DRIVE_CONT) ||
+             (scan_mode == BT_SCAN_FLOCK) ||
+             (scan_mode == WIFI_SCAN_FLOCK_SURVEY) ||
+             (scan_mode == BT_SCAN_ANALYZER)) {
       NimBLEDevice::setScanDuplicateCacheSize(0);
     }
     NimBLEDevice::init("");
     pBLEScan = NimBLEDevice::getScan(); //create new scan
-    if ((scan_mode == BT_SCAN_ALL) || (scan_mode == BT_SCAN_AIRTAG) || (scan_mode == BT_SCAN_FLIPPER) || (scan_mode == BT_SCAN_FLOCK))
+    if ((scan_mode == BT_SCAN_ALL) ||
+        (scan_mode == BT_SCAN_AIRTAG) ||
+        (scan_mode == BT_SCAN_FLIPPER) ||
+        (scan_mode == BT_SCAN_FLOCK) ||
+        (scan_mode == WIFI_SCAN_FLOCK_SURVEY))
     {
       #ifdef HAS_SCREEN
         display_obj.TOP_FIXED_AREA_2 = 48;
@@ -3918,6 +3968,8 @@ void WiFiScan::RunBluetoothScan(uint8_t scan_mode, uint16_t color)
             display_obj.tft.drawCentreString("Flipper Sniff",TFT_WIDTH/2,16,2);
           else if (scan_mode == BT_SCAN_FLOCK)
             display_obj.tft.drawCentreString("Flock Sniff",TFT_WIDTH/2,16,2);
+          else if (scan_mode == WIFI_SCAN_FLOCK_SURVEY)
+            display_obj.tft.drawCentreString("Flock Survey",TFT_WIDTH/2,16,2);
           #if defined(HAS_ILI9341) || defined(HAS_ST7796) || defined(HAS_ST7789)
             display_obj.touchToExit();
           #endif
@@ -3935,7 +3987,7 @@ void WiFiScan::RunBluetoothScan(uint8_t scan_mode, uint16_t color)
         this->clearFlippers();
         pBLEScan->setAdvertisedDeviceCallbacks(new bluetoothScanAllCallback(), true);
       }
-      else if (scan_mode == BT_SCAN_FLOCK) {
+      else if ((scan_mode == BT_SCAN_FLOCK) || (scan_mode == WIFI_SCAN_FLOCK_SURVEY)) {
         pBLEScan->setAdvertisedDeviceCallbacks(new bluetoothScanAllCallback(), true);
       }
     }
@@ -4024,7 +4076,10 @@ void WiFiScan::RunBluetoothScan(uint8_t scan_mode, uint16_t color)
     pBLEScan->setInterval(100);
     pBLEScan->setWindow(99);  // less or equal setInterval value
     pBLEScan->setMaxResults(0);
-    if ((scan_mode == BT_SCAN_WAR_DRIVE_CONT) || (scan_mode == BT_SCAN_FLOCK) || (scan_mode == BT_SCAN_ANALYZER))
+    if ((scan_mode == BT_SCAN_WAR_DRIVE_CONT) ||
+        (scan_mode == BT_SCAN_FLOCK) ||
+        (scan_mode == WIFI_SCAN_FLOCK_SURVEY) ||
+        (scan_mode == BT_SCAN_ANALYZER))
       pBLEScan->setDuplicateFilter(false);
     pBLEScan->start(0, scanCompleteCB, false);
     Serial.println("Started BLE Scan");
@@ -5530,6 +5585,17 @@ void WiFiScan::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
                                                       snifferPacket->rx_ctrl.rssi,
                                                       "WiFi",
                                                       match_rule + " " + (essid.length() ? essid : String(addr)));
+        wifi_scan_obj.appendFlockReviewRow(addr,
+                                           essid,
+                                           snifferPacket->rx_ctrl.channel,
+                                           snifferPacket->rx_ctrl.rssi,
+                                           match_rule,
+                                           "MATCH");
+        wifi_scan_obj.appendFlockMapHit(addr,
+                                        essid.length() ? essid : match_rule,
+                                        snifferPacket->rx_ctrl.channel,
+                                        snifferPacket->rx_ctrl.rssi,
+                                        "WIFI_RAW");
 
         #ifdef HAS_SCREEN
           display_string.concat(is_probe ? MAGENTA_KEY : (hidden_flag ? RED_KEY : GREEN_KEY));
@@ -7565,7 +7631,9 @@ void WiFiScan::main(uint32_t currentTime)
 
     #endif
   }
-  else if ((currentScanMode == WIFI_SCAN_WAR_DRIVE) || (currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE)) {
+  else if ((currentScanMode == WIFI_SCAN_WAR_DRIVE) ||
+           (currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+           (currentScanMode == WIFI_SCAN_FLOCK_SURVEY)) {
     if (currentTime - initTime >= this->channel_hop_delay * 1000)
     {
       initTime = millis();
@@ -7573,7 +7641,8 @@ void WiFiScan::main(uint32_t currentTime)
         if (gps_obj.getGpsModuleStatus())
           this->executeWarDrive();
       #endif
-      if (currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE)
+      if ((currentScanMode == WIFI_SCAN_FLOCK_WAR_DRIVE) ||
+          (currentScanMode == WIFI_SCAN_FLOCK_SURVEY))
         this->drawFlockDashboard();
     }
   }
