@@ -41,7 +41,7 @@ extern "C" {
 #ifdef HAS_BT
   //ESP32 Sour Apple by RapierXbox
   //Exploit by ECTO-1A
-  NimBLEAdvertising *pAdvertising;
+  NimBLEAdvertising *pAdvertising = nullptr;
 
   //// https://github.com/Spooks4576
   NimBLEAdvertisementData WiFiScan::GetUniversalAdvertisementData(EBLEPayloadType Type) {
@@ -596,7 +596,7 @@ bool WiFiScan::checkFlockOUI(const uint8_t mac[6]) {
 String WiFiScan::flockOUIRule(const uint8_t mac[6]) {
   static const uint8_t direct_oui[][3] = {
     {0x58, 0x8E, 0x81}, {0xCC, 0xCC, 0xCC}, {0xEC, 0x1B, 0xBD}, {0x90, 0x35, 0xEA},
-    {0x04, 0x0D, 0x84}, {0xF0, 0x82, 0xC0}, {0x1C, 0x34, 0xF1}, {0x38, 0x5B, 0x44},
+    {0xF0, 0x82, 0xC0}, {0x1C, 0x34, 0xF1}, {0x38, 0x5B, 0x44},
     {0x94, 0x34, 0x69}, {0xB4, 0xE3, 0xF9}, {0x70, 0xC9, 0x4E}, {0x3C, 0x91, 0x80},
     {0xD8, 0xF3, 0xBC}, {0x80, 0x30, 0x49}, {0x14, 0x5A, 0xFC}, {0x74, 0x4C, 0xA1},
     {0x08, 0x3A, 0x88}, {0x9C, 0x2F, 0x9D}, {0x94, 0x08, 0x53}, {0xE4, 0xAA, 0xEA},
@@ -1424,11 +1424,16 @@ bool WiFiScan::scanning() {
 // Function to prepare to run a specific scan
 void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color)
 {  
+  if (scan_mode == WIFI_SCAN_OFF) {
+    StopScan(scan_mode);
+    WiFiScan::currentScanMode = scan_mode;
+    return;
+  }
+
+  WiFiScan::currentScanMode = scan_mode;
   this->set_channel = 1;
   this->initWiFi(scan_mode);
-  if (scan_mode == WIFI_SCAN_OFF)
-    StopScan(scan_mode);
-  else if (scan_mode == WIFI_SCAN_PROBE)
+  if (scan_mode == WIFI_SCAN_PROBE)
     RunProbeScan(scan_mode, color);
   else if (scan_mode == WIFI_SCAN_STATION_WAR_DRIVE)
     RunProbeScan(scan_mode, color);
@@ -1538,8 +1543,6 @@ void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color)
       gps_obj.enable_queue();
     #endif
   }
-
-  WiFiScan::currentScanMode = scan_mode;
 }
 
 void WiFiScan::startWiFiAttacks(uint8_t scan_mode, uint16_t color, String title_string) {
@@ -1674,11 +1677,16 @@ bool WiFiScan::shutdownBLE() {
   #ifdef HAS_BT
     if (this->ble_initialized) {
       Serial.println("Shutting down BLE");
-      pAdvertising->stop();
-      pBLEScan->stop();
+      if (pAdvertising != nullptr)
+        pAdvertising->stop();
+      if (pBLEScan != nullptr)
+        pBLEScan->stop();
       
-      pBLEScan->clearResults();
+      if (pBLEScan != nullptr)
+        pBLEScan->clearResults();
       NimBLEDevice::deinit();
+      pAdvertising = nullptr;
+      pBLEScan = nullptr;
 
       this->_analyzer_value = 0;
     
@@ -3392,6 +3400,19 @@ void WiFiScan::executeWarDrive() {
 
       if (flock_mode)
         this->appendFlockTrackPoint();
+
+      bool resume_survey_ble = false;
+      #ifdef HAS_BT
+        if ((this->currentScanMode == WIFI_SCAN_FLOCK_SURVEY) &&
+            this->ble_initialized &&
+            (pBLEScan != nullptr)) {
+          Serial.println("Flock Survey pausing BLE for WiFi scan");
+          pBLEScan->stop();
+          pBLEScan->clearResults();
+          resume_survey_ble = true;
+          delay(25);
+        }
+      #endif
       
       while (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
         Serial.println("Scan running...");
@@ -3483,6 +3504,14 @@ void WiFiScan::executeWarDrive() {
 
       // Free up that memory, you sexy devil
       WiFi.scanDelete();
+
+      #ifdef HAS_BT
+        if (resume_survey_ble && (pBLEScan != nullptr)) {
+          delay(25);
+          pBLEScan->start(0, scanCompleteCB, false);
+          Serial.println("Flock Survey resumed BLE scan");
+        }
+      #endif
     }
   #endif
 }
