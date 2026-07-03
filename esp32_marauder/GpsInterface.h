@@ -49,6 +49,7 @@ class GpsInterface {
     float getAlt();
     float getAccuracy();
     String getDatetime();
+    String getDatetimeLocal();
     String getText();
     int getTextQueueSize();
     String getTextQueue(bool flush=1);

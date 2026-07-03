@@ -184,6 +184,8 @@ Flock export files use mode-specific names:
 - `flock_sniff_track_*.gpx`
 - `flock_sniff_review_*.csv`
 
+Flock CSV rows and session filenames use US Eastern local time derived from GPS UTC. GPX timestamps remain UTC/Zulu so mapping tools interpret tracks correctly.
+
 The Flock additions are passive detection/logging features. This repo does not add exploit/RCE behavior.
 
 ## Flock Workflow

@@ -827,7 +827,7 @@ String WiFiScan::flockTimestampSuffix() {
 
   #ifdef HAS_GPS
     if (gps_obj.getGpsModuleStatus()) {
-      stamp = gps_obj.getDatetime();
+      stamp = gps_obj.getDatetimeLocal();
     }
   #endif
 
@@ -1026,7 +1026,7 @@ void WiFiScan::appendFlockReviewRow(const String& mac, const String& ssid, int c
 
     File review = SD.open(this->flock_review_file, FILE_APPEND);
     if (review) {
-      review.print(this->flockCsvEscape(gps_obj.getDatetime()));
+      review.print(this->flockCsvEscape(gps_obj.getDatetimeLocal()));
       review.print(",");
       review.print(this->flockCsvEscape(mac));
       review.print(",");

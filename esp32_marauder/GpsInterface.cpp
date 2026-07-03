@@ -568,6 +568,52 @@ String GpsInterface::getDatetime() {
   return this->datetime;
 }
 
+String GpsInterface::getDatetimeLocal() {
+  int year = 0;
+  int month = 0;
+  int day = 0;
+  int hour = 0;
+  int minute = 0;
+  int second = 0;
+
+  if (sscanf(this->datetime.c_str(), "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second) != 6)
+    return this->datetime;
+
+  struct tm gps_time = {};
+  gps_time.tm_year = year - 1900;
+  gps_time.tm_mon = month - 1;
+  gps_time.tm_mday = day;
+  gps_time.tm_hour = hour;
+  gps_time.tm_min = minute;
+  gps_time.tm_sec = second;
+  gps_time.tm_isdst = 0;
+
+  setenv("TZ", "UTC0", 1);
+  tzset();
+  time_t epoch = mktime(&gps_time);
+  if (epoch <= 0)
+    return this->datetime;
+
+  setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0/2", 1);
+  tzset();
+
+  struct tm local_time = {};
+  localtime_r(&epoch, &local_time);
+
+  char formatted[24] = {};
+  snprintf(formatted,
+           sizeof(formatted),
+           "%d-%d-%d %d:%d:%d",
+           local_time.tm_year + 1900,
+           local_time.tm_mon + 1,
+           local_time.tm_mday,
+           local_time.tm_hour,
+           local_time.tm_min,
+           local_time.tm_sec);
+
+  return String(formatted);
+}
+
 String GpsInterface::getNumSatsString() {
   return (String)num_sats;
 }
